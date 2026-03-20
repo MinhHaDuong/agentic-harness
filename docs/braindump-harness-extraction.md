@@ -54,29 +54,46 @@ Could become a "Design Rationale" or "Intellectual Lineage" document.
 Ticket = markdown document as the primitive, GitHub Issues as one backend.
 The system handles **code AND prose** — research papers, not just software.
 
-### Format: YAML frontmatter + markdown body
+### Existing practices to study before choosing a format
 
-See `docs/ticket-template.md` for the canonical example.
+**AI agent harnesses:**
+- **GSD (Get Shit Done)** — 29 skills, 12 agents, fresh context cycling per task.
+  Uses `PLAN.md` as executable instructions (not metadata-driven). `.planning/`
+  directory with PROJECT.md, STATE.md, ROADMAP.md, config.json. Mature, production-tested.
+  ([github.com/gsd-build](https://github.com/gsd-build/get-shit-done))
+- **Claude Code skills** — YAML frontmatter + markdown body, `skills/` directory
+  with SKILL.md + optional scripts/references/assets. Auto-invocation by description.
+- **AGENTS.md standard** — emerging unified convention across Claude Code, Aider,
+  Cline, Cursor. Single file, ≤150 lines, actionable.
+  ([agents.md](https://agents.md/))
+- **Cursor rules** — `.cursor/rules/` with YAML frontmatter (globs, alwaysApply).
+  Per-file-type rule activation.
+- **OpenHands** — GitHub Action triggers on `fix-me` label. Cloud-based, not offline.
+- **Devin** — interactive planning with milestones, Jira/Linear integration. Cloud-only.
+- **SWE-agent/SWE-bench** — evaluation harness, not interactive workflow.
 
-Frontmatter fields: `id`, `title`, `labels`, `status` (open/in-progress/done),
-`branch`, `depends`, `created`. Body sections: Context, Actions, Exit criteria,
-Conversation log. This mirrors GitHub Issues (structured fields + free-text body)
-without requiring their API.
+**Issue-as-code:**
+- **[git-bug](https://github.com/MichaelMure/git-bug)** — issues stored in git
+  objects, not files. Distributed, offline, bridges to GitHub/GitLab/Jira.
+- **[git-issue](https://github.com/dspinellis/git-issue)** — issues as files in
+  a separate git branch.
+- **Plain markdown tickets** — used successfully in Oeconomia wave planning
+  (docs/tickets-*.md). Agents consumed them exactly like GitHub Issues.
 
-### Existing practices to review
+**General task/knowledge management:**
+- **Obsidian/Logseq** — YAML frontmatter + markdown, task plugins. Familiar from
+  Quarto, Hugo, Jekyll, static site generators.
+- **Org-mode** — outline-based, properties drawers for metadata. Rich but Emacs-only.
+- **todo.txt** — plain text, structured by convention. Minimal.
+- **GitHub Issues** — labels, milestones, free-text body. The baseline.
+- **Linear** — structured tickets, keyboard-driven. Commercial.
 
-- **GitHub Issues** (YAML-ish via labels/milestones, free-text body)
-- **GitLab issues** (similar, supports `/commands` in comments)
-- **Linear** (structured tickets, markdown descriptions)
-- **Plain markdown tickets** (used successfully in Oeconomia wave planning)
-- **Obsidian/Logseq** (YAML frontmatter + markdown, task management plugins)
-- **todo.txt** (plain text, structured by convention)
-- **Org-mode** (outline-based, properties drawers for metadata)
-- **Issue-as-code**: [git-bug](https://github.com/MichaelMure/git-bug),
-  [git-issue](https://github.com/dspinellis/git-issue) — store issues in git itself
-
-The YAML frontmatter approach is closest to Obsidian/Jekyll conventions and is
-already familiar from Quarto, Hugo, and static site generators.
+**Key comparison axes:**
+- Offline vs cloud-dependent
+- Code-only vs code+prose
+- Metadata format (YAML frontmatter vs structured fields vs free text)
+- Git-native vs API-dependent
+- Composability (skills, experts, teams)
 
 ### Proposed convention
 
