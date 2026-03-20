@@ -52,34 +52,120 @@ Could become a "Design Rationale" or "Intellectual Lineage" document.
 ## 3. Offline ticket system — file-based, gh-optional
 
 Ticket = markdown document as the primitive, GitHub Issues as one backend.
+The system handles **code AND prose** — research papers, not just software.
 
-**Proposed convention:**
+### Format: YAML frontmatter + markdown body
+
+```markdown
+---
+id: 42
+title: Refactor classify_type complexity
+labels: [triage/now, techdebt]
+status: open  # open | in-progress | done
+branch: t42-classify-type
+depends: []
+created: 2026-03-19
+---
+
+## Context
+...
+
+## Actions
+...
+
+## Exit criteria
+...
+
+## Conversation log
+...
+```
+
+YAML frontmatter for structured metadata (labels, status, dependencies),
+markdown body for description and conversation. This mirrors GitHub Issues
+(structured fields + free-text body) without requiring their API.
+
+### Existing practices to review
+
+- **GitHub Issues** (YAML-ish via labels/milestones, free-text body)
+- **GitLab issues** (similar, supports `/commands` in comments)
+- **Linear** (structured tickets, markdown descriptions)
+- **Plain markdown tickets** (used successfully in Oeconomia wave planning)
+- **Obsidian/Logseq** (YAML frontmatter + markdown, task management plugins)
+- **todo.txt** (plain text, structured by convention)
+- **Org-mode** (outline-based, properties drawers for metadata)
+- **Issue-as-code**: [git-bug](https://github.com/MichaelMure/git-bug),
+  [git-issue](https://github.com/dspinellis/git-issue) — store issues in git itself
+
+The YAML frontmatter approach is closest to Obsidian/Jekyll conventions and is
+already familiar from Quarto, Hugo, and static site generators.
+
+### Proposed convention
+
 ```
 tickets/
-  NNN-short-title.md       # open ticket
-  done/NNN-short-title.md  # completed (moved after merge)
+  042-classify-type.md       # open ticket
+  done/042-classify-type.md  # completed (moved after merge)
 ```
 
-**Why:**
-- Zero external dependencies. Works in any sandbox, container, or CI.
-- Tickets versioned in git. Agents can create without auth tokens.
-- Hybrid model: local files as source of truth, gh sync when available.
+- `start-ticket` reads from `tickets/NNN-*.md` instead of `gh issue view NNN`.
+- `celebrate.md` moves the file to `done/` and appends a completion summary.
+- When `gh` is available, a sync script can push/pull between local files and GitHub Issues.
 
-**What we lose without GitHub:** Web UI, labels, milestones, project boards, webhooks.
+### What we lose without GitHub
 
-## 3b. Skill-based agent coordination
+Current usage across MinhHaDuong repos (as of 2026-03-20):
+- **Oeconomia**: 30 issues, 30 PRs — heavy user of issues and PRs
+- **sdg7evn**: 12 issues, 0 PRs — issues only
+- **nvfd, dotfiles**: issues disabled
+- **aedist, VinaPyPSA**: minimal (0-2 issues)
+
+Features actually used: issues (descriptions, labels, triage/* labels), PRs
+(review, diff, merge). Not used: milestones, projects/boards, webhooks,
+sub-issues.
+
+**Keep:** Labels (in frontmatter), issue-PR linking (branch name convention).
+**Don't need:** Milestones, projects, webhooks.
+**PRs stay on GitHub** — diff review and merge workflow has no good local
+equivalent. The ticket system is for planning; PRs are for execution review.
+
+## 4. Skill-based agent coordination
 
 Replace fixed agent perspective tables with composable skill pool:
-- Skills: atomic markdown files (one sentence scope each)
-- Experts: named skill bundles + perspective (yaml)
-- Coordinators: runbooks assemble purpose-built teams per event
-- Academic metaphor: skill=expertise, expert=reviewer, coordinator=editor
+- **Skills**: atomic markdown files (one sentence scope + instructions).
+  May include scripts and reference data (e.g., a journal spec skill bundles
+  the style guide PDF + a checking script).
+- **Experts**: named skill bundles + perspective (yaml).
+  E.g., `reviewers/security.yaml` = skills `[owasp-top10, dependency-audit, secret-scan]` + perspective "adversarial".
+- **Coordinators**: runbooks assemble purpose-built teams per event.
+- Academic metaphor: skill=expertise, expert=reviewer, coordinator=editor.
 
-## 3c. Background ticket poller
+### Skills vs runbooks
 
-A background agent that watches the ticket queue, picks ripe tickets (dependencies met), and starts work or alerts. Automating the "Select" step of the wave cycle.
+| | Skills | Runbooks |
+|---|--------|---------|
+| **Triggered by** | Invoked on demand (`/skill-name`) | Triggered by events (on-start, pre-commit) |
+| **Contains** | Knowledge + instructions, optionally scripts/data | Procedural steps, checklists |
+| **Scope** | One capability ("review for security", "format Oeconomia style") | One workflow ("start a ticket", "celebrate completion") |
+| **Composable** | Yes — experts bundle multiple skills | No — runbooks are standalone procedures |
+| **Example** | `skills/journal-scientific-data/` with author guidelines + checker | `runbooks/review-pr.md` with step-by-step review procedure |
 
-## 4. Type assertion guidelines — light touch
+### Sweep disk for skills
+
+Existing skills scattered across machines and surfaces:
+- Claude web interface: custom instructions, project knowledge files
+- `~/.claude/commands/` or project `.claude/commands/`: Claude Code custom commands
+- Project-specific `skills/` directories if any
+- Writing guidelines, coding guidelines = skills in disguise
+
+Action: inventory all of these, repatriate into `skills/` in this repo as canonical home.
+
+## 5. Background ticket poller
+
+A background agent that watches the ticket queue (GitHub Issues or `tickets/`
+directory), picks ripe tickets (dependencies met), and starts work or alerts.
+Automating the "Select" step of the wave cycle.
+
+## 6. Type assertion guidelines — light touch
 
 **Core principle: defensive effort proportional to risk.**
 
@@ -96,36 +182,13 @@ Key rules:
 - No ABC classes — use Protocol if you need a contract
 - No type-level gymnastics for research scripts
 
-## 5. Script hygiene defaults
+## 7. Script hygiene defaults
 
 - **One output, one script**: 1 figure = 1 script file
 - **Unix-style I/O**: default to stdin/stdout, optional `-i`/`-o` args
 - **Log, not print**: all diagnostics through `logging` to stderr
 
-## 6. Sweep disk for reusable guidelines
+## 8. Sweep disk for reusable guidelines
 
-Harvest conventions from past projects: UTF-8, logging patterns, EditorConfig, pyproject.toml, git hooks, .env patterns.
-
-## Codebase review findings (2026-03-19)
-
-From audit of Oeconomia pipeline (63 scripts, ~19k lines):
-
-**Works well:** Zero classes, no security smells, consistent `get_logger()`, f-strings dominant.
-
-**Remaining issues:**
-1. `utils.py` is 717-line god module (logging, retries, paths, checkpointing)
-2. Plotting scripts have 200-400 line functions
-3. Hardcoded constants across 20+ scripts
-
-| Metric | Value |
-|--------|-------|
-| Total scripts | 68 |
-| Average length | ~308 lines |
-| Longest | `collect_syllabi.py` (855 lines) |
-| Classes | 0 |
-| Functions >50 statements | 22 |
-| Test files | 27 |
-
-## Arc
-
-Six ideas forming a coherent sequence: extract the methodology (1), validate intellectually (2), operationalize it (3), add sensible defaults (4+5+6).
+Harvest conventions from past projects: UTF-8, logging patterns, EditorConfig,
+pyproject.toml, git hooks, .env patterns.
