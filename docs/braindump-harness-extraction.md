@@ -56,33 +56,12 @@ The system handles **code AND prose** — research papers, not just software.
 
 ### Format: YAML frontmatter + markdown body
 
-```markdown
----
-id: 42
-title: Refactor classify_type complexity
-labels: [triage/now, techdebt]
-status: open  # open | in-progress | done
-branch: t42-classify-type
-depends: []
-created: 2026-03-19
----
+See `docs/ticket-template.md` for the canonical example.
 
-## Context
-...
-
-## Actions
-...
-
-## Exit criteria
-...
-
-## Conversation log
-...
-```
-
-YAML frontmatter for structured metadata (labels, status, dependencies),
-markdown body for description and conversation. This mirrors GitHub Issues
-(structured fields + free-text body) without requiring their API.
+Frontmatter fields: `id`, `title`, `labels`, `status` (open/in-progress/done),
+`branch`, `depends`, `created`. Body sections: Context, Actions, Exit criteria,
+Conversation log. This mirrors GitHub Issues (structured fields + free-text body)
+without requiring their API.
 
 ### Existing practices to review
 
