@@ -1,0 +1,154 @@
+#!/usr/bin/env python3
+"""Usage report from stats-cache snapshots and agent events.
+
+Reads:
+  ~/.claude/telemetry/snapshots/*.json  (daily stats-cache copies)
+  ~/.claude/telemetry/events.jsonl      (fine-grained agent metrics)
+  ~/.claude/stats-cache.json            (live, if no snapshot for today)
+"""
+
+import json
+import os
+import sys
+from datetime import datetime, timedelta
+from pathlib import Path
+
+TELEMETRY_DIR = Path(os.environ.get("CLAUDE_TELEMETRY_DIR", Path.home() / ".claude" / "telemetry"))
+SNAPSHOTS_DIR = TELEMETRY_DIR / "snapshots"
+EVENTS_FILE = Path(os.environ.get("CLAUDE_TELEMETRY_EVENTS", TELEMETRY_DIR / "events.jsonl"))
+LIVE_CACHE = Path.home() / ".claude" / "stats-cache.json"
+
+
+def load_latest_snapshot():
+    """Load the most recent snapshot, falling back to live stats-cache."""
+    snapshots = sorted(SNAPSHOTS_DIR.glob("*.json")) if SNAPSHOTS_DIR.exists() else []
+    if snapshots:
+        path = snapshots[-1]
+    elif LIVE_CACHE.exists():
+        path = LIVE_CACHE
+    else:
+        print("No snapshots or stats-cache found.", file=sys.stderr)
+        sys.exit(1)
+
+    with open(path) as f:
+        return json.load(f), path.name
+
+
+def load_events():
+    """Load agent events from JSONL."""
+    events = []
+    if EVENTS_FILE.exists():
+        with open(EVENTS_FILE) as f:
+            for line in f:
+                line = line.strip()
+                if line:
+                    events.append(json.loads(line))
+    return events
+
+
+def format_tokens(n):
+    """Format token count for display."""
+    if n >= 1_000_000:
+        return f"{n / 1_000_000:.1f}M"
+    if n >= 1_000:
+        return f"{n / 1_000:.1f}K"
+    return str(n)
+
+
+def print_overview(data, source):
+    """Print overview from stats-cache data."""
+    print(f"=== Usage Report (source: {source}) ===\n")
+
+    print(f"Total sessions: {data.get('totalSessions', '?')}")
+    print(f"Total messages: {data.get('totalMessages', '?')}")
+
+    first = data.get("firstSessionDate", "")[:10]
+    if first:
+        print(f"First session:  {first}")
+    print()
+
+    # Model usage
+    model_usage = data.get("modelUsage", {})
+    if model_usage:
+        print("Model usage (all time):")
+        print(f"  {'Model':<35} {'Input':>10} {'Output':>10} {'Cache Read':>12} {'Cache Create':>12}")
+        print(f"  {'-'*35} {'-'*10} {'-'*10} {'-'*12} {'-'*12}")
+        for model, usage in sorted(model_usage.items()):
+            short = model.replace("claude-", "").replace("-20251001", "").replace("-20250929", "")
+            inp = format_tokens(usage.get("inputTokens", 0))
+            out = format_tokens(usage.get("outputTokens", 0))
+            cr = format_tokens(usage.get("cacheReadInputTokens", 0))
+            cc = format_tokens(usage.get("cacheCreationInputTokens", 0))
+            print(f"  {short:<35} {inp:>10} {out:>10} {cr:>12} {cc:>12}")
+        print()
+
+    # Recent daily activity
+    daily = data.get("dailyActivity", [])
+    if daily:
+        recent = daily[-7:]
+        print(f"Daily activity (last {len(recent)} days):")
+        print(f"  {'Date':<12} {'Messages':>10} {'Sessions':>10} {'Tool calls':>12}")
+        print(f"  {'-'*12} {'-'*10} {'-'*10} {'-'*12}")
+        for day in recent:
+            print(f"  {day['date']:<12} {day['messageCount']:>10} {day['sessionCount']:>10} {day['toolCallCount']:>12}")
+        print()
+
+    # Recent daily tokens by model
+    daily_tokens = data.get("dailyModelTokens", [])
+    if daily_tokens:
+        recent_tokens = daily_tokens[-7:]
+        print(f"Daily tokens by model (last {len(recent_tokens)} days):")
+        print(f"  {'Date':<12} {'Tokens':>12} {'Models'}")
+        print(f"  {'-'*12} {'-'*12} {'-'*30}")
+        for day in recent_tokens:
+            by_model = day.get("tokensByModel", {})
+            total = sum(by_model.values())
+            models = ", ".join(
+                f"{m.replace('claude-', '').split('-202')[0]}={format_tokens(v)}"
+                for m, v in sorted(by_model.items(), key=lambda x: -x[1])
+            )
+            print(f"  {day['date']:<12} {format_tokens(total):>12} {models}")
+        print()
+
+    # Peak day
+    if daily_tokens:
+        peak = max(daily_tokens, key=lambda d: sum(d.get("tokensByModel", {}).values()))
+        peak_total = sum(peak.get("tokensByModel", {}).values())
+        print(f"Peak day: {peak['date']} ({format_tokens(peak_total)} tokens)")
+        print()
+
+
+def print_events(events):
+    """Print agent event summary."""
+    if not events:
+        return
+
+    print(f"=== Agent Events ({len(events)} logged) ===\n")
+
+    # Group by task type
+    by_type = {}
+    for e in events:
+        t = e.get("task", "unknown")
+        by_type.setdefault(t, []).append(e)
+
+    print(f"  {'Task type':<20} {'Count':>6} {'Avg tokens':>12} {'Avg TPM':>10} {'Avg dur':>10}")
+    print(f"  {'-'*20} {'-'*6} {'-'*12} {'-'*10} {'-'*10}")
+    for task_type, task_events in sorted(by_type.items()):
+        count = len(task_events)
+        avg_tokens = sum(e.get("tokens", 0) for e in task_events) // count
+        avg_tpm = sum(e.get("eff_tpm", 0) for e in task_events) // count
+        avg_dur = sum(e.get("dur_ms", 0) for e in task_events) // count // 1000
+        print(f"  {task_type:<20} {count:>6} {format_tokens(avg_tokens):>12} {avg_tpm:>10} {avg_dur:>8}s")
+    print()
+
+
+def main():
+    data, source = load_latest_snapshot()
+    print_overview(data, source)
+
+    events = load_events()
+    print_events(events)
+
+
+if __name__ == "__main__":
+    main()

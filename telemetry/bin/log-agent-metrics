@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+# Log agent task notification metrics to events.jsonl
+# Usage: log-agent-metrics <agent_id> <task_type> <tokens> <tool_uses> <duration_ms> [model] [project]
+set -euo pipefail
+
+EVENTS_FILE="${CLAUDE_TELEMETRY_EVENTS:-$HOME/.claude/telemetry/events.jsonl}"
+mkdir -p "$(dirname "$EVENTS_FILE")"
+
+AGENT_ID="${1:?Usage: log-agent-metrics <id> <task> <tokens> <tools> <dur_ms> [model] [project]}"
+TASK_TYPE="${2:?}"
+TOKENS="${3:?}"
+TOOL_USES="${4:?}"
+DURATION_MS="${5:?}"
+MODEL="${6:-opus}"
+PROJECT="${7:-unknown}"
+
+TS="$(date -u +%FT%TZ)"
+
+# Compute effective TPM
+if [ "$DURATION_MS" -gt 0 ]; then
+    EFF_TPM=$(python3 -c "print(int($TOKENS * 60000 / $DURATION_MS))")
+else
+    EFF_TPM=0
+fi
+
+printf '{"ts":"%s","type":"agent","id":"%s","task":"%s","tokens":%s,"tools":%s,"dur_ms":%s,"eff_tpm":%s,"model":"%s","project":"%s"}\n' \
+    "$TS" "$AGENT_ID" "$TASK_TYPE" "$TOKENS" "$TOOL_USES" "$DURATION_MS" "$EFF_TPM" "$MODEL" "$PROJECT" \
+    >> "$EVENTS_FILE"
+
+echo "Logged: $TASK_TYPE ($TOKENS tokens, ${DURATION_MS}ms, TPM=$EFF_TPM)"

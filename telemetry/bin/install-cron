@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# Install daily cron job for stats-cache snapshots at 23:55
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+SNAPSHOT_CMD="$SCRIPT_DIR/snapshot"
+CRON_ENTRY="55 23 * * * $SNAPSHOT_CMD"
+
+# Check if already installed
+if crontab -l 2>/dev/null | grep -qF "$SNAPSHOT_CMD"; then
+    echo "Cron already installed:"
+    crontab -l | grep -F "$SNAPSHOT_CMD"
+    exit 0
+fi
+
+# Append to existing crontab
+(crontab -l 2>/dev/null; echo "$CRON_ENTRY") | crontab -
+echo "Installed: $CRON_ENTRY"

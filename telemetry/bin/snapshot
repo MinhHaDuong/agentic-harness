@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# Take a snapshot of ~/.claude/stats-cache.json
+# Usage: snapshot [YYYY-MM-DD]
+set -euo pipefail
+
+SNAPSHOTS_DIR="${CLAUDE_TELEMETRY_DIR:-$HOME/.claude/telemetry/snapshots}"
+SOURCE="$HOME/.claude/stats-cache.json"
+DATE="${1:-$(date +%F)}"
+DEST="$SNAPSHOTS_DIR/$DATE.json"
+
+mkdir -p "$SNAPSHOTS_DIR"
+
+if [ ! -f "$SOURCE" ]; then
+    echo "Error: $SOURCE not found" >&2
+    exit 1
+fi
+
+cp "$SOURCE" "$DEST"
+echo "Snapshot saved: $DEST ($(wc -c < "$DEST") bytes)"
