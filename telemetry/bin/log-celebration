@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+# Log a celebration report to celebrations.jsonl
+# Usage: log-celebration <project> <session_summary_json>
+# Or pipe JSON: echo '{"project":"...","commits":7,...}' | log-celebration
+set -euo pipefail
+
+CELEBRATIONS_FILE="${CLAUDE_TELEMETRY_DIR:-$HOME/.claude/telemetry}/celebrations.jsonl"
+mkdir -p "$(dirname "$CELEBRATIONS_FILE")"
+
+TS="$(date -u +%FT%TZ)"
+DATE="$(date +%F)"
+
+if [ $# -ge 1 ]; then
+    INPUT="$1"
+else
+    INPUT="$(cat)"
+fi
+
+# Prepend timestamp and date
+echo "$INPUT" | python3 -c "
+import json, sys
+data = json.loads(sys.stdin.read())
+data['ts'] = '$TS'
+data['date'] = '$DATE'
+print(json.dumps(data))
+" >> "$CELEBRATIONS_FILE"
+
+echo "Celebration logged: $CELEBRATIONS_FILE"
