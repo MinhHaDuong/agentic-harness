@@ -2,6 +2,13 @@
 # SessionStart hook: set agent identity and activate git hooks.
 # Runs at the beginning of every Claude Code session.
 
+# Auto-update harness from ImperialDragonHarness repo (once per day)
+_harness_stamp="$HOME/.claude/.last-pull"
+_today=$(date +%Y-%m-%d)
+if [ ! -f "$_harness_stamp" ] || [ "$(cat "$_harness_stamp")" != "$_today" ]; then
+    git -C "$HOME/.claude" pull --ff-only --quiet 2>/dev/null && echo "$_today" > "$_harness_stamp"
+fi
+
 cd "$CLAUDE_PROJECT_DIR" || exit 0
 
 # Load .env if present
