@@ -49,6 +49,11 @@ if [ -d hooks ]; then
     git config core.hooksPath hooks 2>/dev/null
 fi
 
+# Check for stale rules (advisory)
+if [ -f hooks/warn-stale-rules.sh ]; then
+    bash hooks/warn-stale-rules.sh
+fi
+
 echo "Agent identity configured."
 if [ -f STATE.md ]; then
     cat STATE.md

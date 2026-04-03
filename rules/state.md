@@ -1,6 +1,7 @@
 ---
 paths:
   - "STATE.md"
+last-reviewed: 2026-04-04
 ---
 
 # STATE.md

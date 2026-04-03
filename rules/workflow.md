@@ -1,3 +1,4 @@
+<!-- last-reviewed: 2026-04-04 -->
 # Session Start
 
 At the beginning of every conversation:

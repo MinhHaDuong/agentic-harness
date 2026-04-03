@@ -1,3 +1,4 @@
+<!-- last-reviewed: 2026-04-04 -->
 # Git Discipline
 
 - **Always work on a branch.** Main is read-only except for STATE housekeeping.
