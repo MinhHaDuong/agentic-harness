@@ -35,3 +35,7 @@ Save a feedback memory at each escalation (what failed, why). Stop if repeating 
 
 - You're stuck after three different approaches (including expert fan-out).
 - The task requires a judgment call outside your domain docs.
+
+# Compaction
+
+When compacting, preserve the list of modified files, test commands, and current implementation plan.
