@@ -1,0 +1,18 @@
+{
+  "skipDangerousModePermissionPrompt": true,
+  "effortLevel": "max",
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/.claude/hooks/on-start.sh",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
+  }
+}

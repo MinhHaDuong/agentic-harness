@@ -16,6 +16,7 @@
 !docs/
 !docs/**
 
-# Settings contain machine-specific paths and permissions
-# Track a template, not the live file
+# settings.json: universal config (hooks, effortLevel) — tracked
+# settings.local.json: machine-specific permissions — gitignored
+!settings.json
 !settings.template.json
