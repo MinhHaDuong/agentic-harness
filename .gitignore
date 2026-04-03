@@ -11,6 +11,8 @@
 !skills/**
 !hooks/
 !hooks/**
+!bin/
+!bin/**
 !commands/
 !commands/**
 !docs/

@@ -12,7 +12,8 @@ Run when the user ends a work session ("done for today", "let's stop", "wrap up"
 ## Steps
 
 1. **Reflect on the session** — summarize work done. `git log --since="6am" --oneline` as starting point.
-2. **Push all branches** — no local-only work overnight. `git branch` → ensure each non-main branch is pushed.
+2. **Log session metrics** — run `~/.claude/bin/log-agent-metrics` with: `<session_id> session <total_tokens> <tool_uses> <duration_ms> <model> <project>`. Estimate tokens from conversation length if exact count unavailable.
+3. **Push all branches** — no local-only work overnight. `git branch` → ensure each non-main branch is pushed.
 3. **Commit WIP if needed** — uncommitted work gets `wip:` prefix and push.
 4. **Handoff notes** — for in-progress tickets with unpushed context, add a GitHub comment: what's done, what's next, blockers.
 5. **Hygiene sweep**:
