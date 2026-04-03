@@ -16,7 +16,7 @@ Unsupervised session — work autonomously, review your own PRs, push forward on
 
 **Deliverable work ≥60%, tooling ≤40%.** If two consecutive tickets were tooling, the next must advance a deliverable. Track in session log.
 
-**Deliverables**: items in `ROADMAP.md` under current milestone — papers, slides, reading notes, figures, responses to reviewers. Tooling: tests, hygiene, refactoring, harness improvements.
+**Deliverables**: items in `STATE.md` under current milestone — papers, slides, reading notes, figures, responses to reviewers. Tooling: tests, hygiene, refactoring, harness improvements.
 
 **Escape hatch**: if `make check-fast` fails and blocks all deliverable work, tooling may exceed 40%. Document why.
 
@@ -27,7 +27,7 @@ Loop of Imperial Dragon cycles: Imagine → Plan → Execute → Verify → Cele
 ### Picking targets (per cycle)
 
 1. Scientific deliverable is paramount
-2. Resolve gaps with north star (ROADMAP.md)
+2. Resolve gaps with north star (STATE.md)
 3. Fix ripest open issues
 4. Sweep for inline markers (FIXME, TODO, HACK)
 

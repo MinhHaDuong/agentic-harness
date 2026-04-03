@@ -22,7 +22,7 @@ Every task passes through five phases:
 │   ├── git.md          # Git discipline (branch, commit, worktree)
 │   ├── workflow.md     # Session start, escalation, phase transitions
 │   ├── coding.md       # Python style, testing, Make patterns
-│   └── state-roadmap.md # STATE.md/ROADMAP.md spec
+│   └── state.md         # STATE.md spec
 ├── skills/         # On-demand slash commands
 │   ├── celebrate/      # Post-task wrap-up
 │   ├── end-session/    # Day wrap-up

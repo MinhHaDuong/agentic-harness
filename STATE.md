@@ -1,4 +1,19 @@
-# Imperial Dragon Harness — Roadmap
+# Imperial Dragon Harness — State
+
+Last updated: 2026-04-03
+
+## Status
+
+Extraction and consolidation in progress.
+
+## Blockers
+
+None
+
+## Next actions
+
+- Review against references (5 levels, 10 principles)
+- Merge REALF guidelines and business rules
 
 ## North star
 
@@ -14,9 +29,9 @@ A reusable, science-backed harness for AI-assisted research: code and prose, day
 
 ## Next milestone: Self-improvement loop
 
-- [ ] Overnight evaluation: benchmark harness against Forsythe's 10 principles
-- [ ] Measure compliance rates (context hygiene, review quality, token economy)
-- [ ] Automated staleness detection for rules and skills
+- Overnight evaluation: benchmark harness against Forsythe's 10 principles
+- Measure compliance rates (context hygiene, review quality, token economy)
+- Automated staleness detection for rules and skills
 
 ## Backlog
 

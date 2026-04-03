@@ -36,7 +36,7 @@ Persistent memory lives at `$CLAUDE_MEMORY_DIR/MEMORY.md`.
 
 - Anything derivable from code, git history, or other docs
 - Ephemeral task state (use STATE.md or git commits)
-- Content already in README, ROADMAP, STATE, rules, or skills
+- Content already in README, STATE, rules, or skills
 
 ## List size limits
 
