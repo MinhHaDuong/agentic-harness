@@ -13,6 +13,18 @@
           }
         ]
       }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/.claude/hooks/guard-destructive-bash.sh",
+            "timeout": 5
+          }
+        ]
+      }
     ]
   }
 }
