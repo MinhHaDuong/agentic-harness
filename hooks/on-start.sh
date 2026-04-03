@@ -9,8 +9,6 @@ if [ ! -f "$_harness_stamp" ] || [ "$(cat "$_harness_stamp")" != "$_today" ]; th
     git -C "$HOME/.claude" pull --ff-only --quiet 2>/dev/null && echo "$_today" > "$_harness_stamp"
 fi
 
-[ -n "$CLAUDE_PROJECT_DIR" ] && cd "$CLAUDE_PROJECT_DIR" || exit 0
-
 # Persist .env vars to CLAUDE_ENV_FILE (survives hook exit)
 persist_env() {
     local envfile="$1"
@@ -19,7 +17,12 @@ persist_env() {
     grep -v '^\s*#' "$envfile" | grep -v '^\s*$' | sed 's/^export //' >> "$CLAUDE_ENV_FILE"
 }
 
-persist_env "$HOME/.claude/.env"          # user-level (shared secrets)
+# User-level env loaded unconditionally (before project-dir check)
+persist_env "$HOME/.claude/.env"
+
+# Everything below requires a project directory
+[ -n "$CLAUDE_PROJECT_DIR" ] && cd "$CLAUDE_PROJECT_DIR" || exit 0
+
 persist_env "$CLAUDE_PROJECT_DIR/.env"    # project-level (overrides)
 
 # Source persisted vars so they're available for git config below
