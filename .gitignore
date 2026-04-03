@@ -18,7 +18,7 @@
 !docs/
 !docs/**
 
-# settings.json: universal config (hooks, effortLevel) — tracked
+# settings.json: universal config (hooks, effortLevel, universal permissions) — tracked
 # settings.local.json: machine-specific permissions — gitignored
 !settings.json
 !settings.template.json
