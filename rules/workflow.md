@@ -2,13 +2,9 @@
 
 At the beginning of every conversation:
 
-> Setup (env, git identity, hooks path, GH_TOKEN) is handled automatically by the SessionStart hook.
+> Setup (env, git identity, hooks path, GH_TOKEN) and project STATE are delivered by the SessionStart hook.
 
-## 1. Orient
-
-Read `STATE.md` and `ROADMAP.md`.
-
-## 2. Isolate and announce phase
+## 1. Isolate and announce phase
 
 **GATE — nothing below this step runs until the worktree is entered.**
 

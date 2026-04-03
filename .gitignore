@@ -4,7 +4,7 @@
 # Harness components
 !.gitignore
 !README.md
-!ROADMAP.md
+!STATE.md
 !rules/
 !rules/**
 !skills/

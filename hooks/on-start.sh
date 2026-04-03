@@ -46,4 +46,7 @@ if [ -d hooks ]; then
     git config core.hooksPath hooks 2>/dev/null
 fi
 
-echo "Agent identity configured. Read STATE.md and ROADMAP.md to orient."
+echo "Agent identity configured."
+if [ -f STATE.md ]; then
+    cat STATE.md
+fi

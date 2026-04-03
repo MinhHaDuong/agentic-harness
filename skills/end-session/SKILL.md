@@ -21,10 +21,10 @@ Run when the user ends a work session ("done for today", "let's stop", "wrap up"
    - `gh issue list` → no orphan issues
    - `gh pr list` → no stale PRs
 6. **Full test suite** — `make check` on main. New failures → open ticket (tag `bug`). Known failures → confirm still open.
-7. **Refresh STATE.md and ROADMAP.md** on a throwaway branch per rules:
+7. **Refresh STATE.md** on a throwaway branch per rules:
    a. `git checkout -b housekeeping-state-YYYY-MM-DD main`
-   b. Rewrite STATE: current stats, blockers, next actions. No changelog.
-   c. Prune ROADMAP: delete items checked off before this session.
+   b. Rewrite STATE: current stats, blockers, next actions, milestones. No changelog.
+   c. Prune: delete items checked off before this session.
    d. Commit, merge to main via fast-forward, delete branch.
 8. **Memory sweep** — follow `/memory` skill (includes staleness check + rule cross-reference).
 9. **Autonomous session** — offer to launch `/autonomous` if user wants unsupervised work.
