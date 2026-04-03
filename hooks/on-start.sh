@@ -9,16 +9,31 @@ if [ ! -f "$_harness_stamp" ] || [ "$(cat "$_harness_stamp")" != "$_today" ]; th
     git -C "$HOME/.claude" pull --ff-only --quiet 2>/dev/null && echo "$_today" > "$_harness_stamp"
 fi
 
-cd "$CLAUDE_PROJECT_DIR" || exit 0
+[ -n "$CLAUDE_PROJECT_DIR" ] && cd "$CLAUDE_PROJECT_DIR" || exit 0
 
-# Load .env if present
-if [ -f .env ]; then
-    set -a
-    source .env
-    set +a
+# Persist .env vars to CLAUDE_ENV_FILE (survives hook exit)
+persist_env() {
+    local envfile="$1"
+    [ -f "$envfile" ] || return 0
+    [ -n "$CLAUDE_ENV_FILE" ] || return 0
+    grep -v '^\s*#' "$envfile" | grep -v '^\s*$' | sed 's/^export //' >> "$CLAUDE_ENV_FILE"
+}
+
+persist_env "$HOME/.claude/.env"          # user-level (shared secrets)
+persist_env "$CLAUDE_PROJECT_DIR/.env"    # project-level (overrides)
+
+# Source persisted vars so they're available for git config below
+if [ -n "$CLAUDE_ENV_FILE" ] && [ -f "$CLAUDE_ENV_FILE" ]; then
+    set -a; source "$CLAUDE_ENV_FILE"; set +a
 fi
 
-# Set agent identity (non-blocking: don't fail if vars are missing)
+# GH_TOKEN alias (gh CLI needs this specific name)
+if [ -n "$AGENT_GH_TOKEN" ] && [ -n "$CLAUDE_ENV_FILE" ]; then
+    echo "GH_TOKEN=$AGENT_GH_TOKEN" >> "$CLAUDE_ENV_FILE"
+    export GH_TOKEN="$AGENT_GH_TOKEN"
+fi
+
+# Set agent identity
 if [ -n "$AGENT_GIT_NAME" ]; then
     git config user.name "$AGENT_GIT_NAME"
 fi
@@ -29,13 +44,6 @@ fi
 # Activate project hooks if hooks/ directory exists
 if [ -d hooks ]; then
     git config core.hooksPath hooks 2>/dev/null
-fi
-
-# Export GitHub token for gh CLI
-if [ -n "$AGENT_GH_TOKEN" ]; then
-    if [ -n "$CLAUDE_ENV_FILE" ]; then
-        echo "GH_TOKEN=$AGENT_GH_TOKEN" >> "$CLAUDE_ENV_FILE"
-    fi
 fi
 
 echo "Agent identity configured. Read STATE.md and ROADMAP.md to orient."

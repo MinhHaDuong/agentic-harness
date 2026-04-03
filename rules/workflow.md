@@ -2,30 +2,13 @@
 
 At the beginning of every conversation:
 
-## 1. Setup
+> Setup (env, git identity, hooks path, GH_TOKEN) is handled automatically by the SessionStart hook.
 
-Load `.env`, set agent identity, and activate hooks. Each line is a **separate Bash call** (compound `&&` chains bypass permission patterns):
-```bash
-set -a; source .env; set +a
-```
-```bash
-git config user.name  "$AGENT_GIT_NAME"
-```
-```bash
-git config user.email "$AGENT_GIT_EMAIL"
-```
-```bash
-git config core.hooksPath hooks
-```
-```bash
-export GH_TOKEN="$AGENT_GH_TOKEN"
-```
-
-## 2. Orient
+## 1. Orient
 
 Read `STATE.md` and `ROADMAP.md`.
 
-## 3. Isolate and announce phase
+## 2. Isolate and announce phase
 
 **GATE — nothing below this step runs until the worktree is entered.**
 
