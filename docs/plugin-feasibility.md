@@ -15,13 +15,13 @@ Claude Code ships a built-in plugin system with:
 - In-session: `/plugin` command, `/reload-plugins`
 - Loading: `claude --plugin-dir ./path` for development
 - Distribution: marketplace repos, official Anthropic marketplace
-- Namespaced skills: `/imperial-dragon:review-pr`
+- Namespaced skills: `/idh:review-pr`
 
 ## Component mapping
 
 | Harness component | Plugin equivalent | Notes |
 |---|---|---|
-| `skills/*/SKILL.md` | `skills/*/SKILL.md` | Identical format. Namespaced as `/imperial-dragon:skill-name` |
+| `skills/*/SKILL.md` | `skills/*/SKILL.md` | Identical format. Namespaced as `/idh:skill-name` |
 | `hooks/*.sh` | `scripts/*.sh` + `hooks/hooks.json` | Hooks declared in JSON, scripts use `${CLAUDE_PLUGIN_ROOT}` |
 | `rules/*.md` | `skills/harness-rules/*.md` | Rules as skill companion files (auto-invoked) |
 | `commands/*.md` | `commands/*.md` | Identical. Legacy but supported |
@@ -123,7 +123,7 @@ coexist.
 | Create `hooks/hooks.json` | Small | Translate settings.json hooks format |
 | Update hook paths to use `${CLAUDE_PLUGIN_ROOT}` | Small | Search-replace |
 | Test with `claude --plugin-dir` | Small | Verify all components load |
-| Namespace skill invocations in docs | Small | `/review-pr` becomes `/imperial-dragon:review-pr` |
+| Namespace skill invocations in docs | Small | `/review-pr` becomes `/idh:review-pr` |
 | Package rules as skill companion files | Small | Create `skills/harness-rules/SKILL.md` + copy 4 rule files |
 
 **Total**: ~2 hours of mechanical work. No design changes needed.

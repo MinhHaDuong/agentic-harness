@@ -22,7 +22,7 @@ Every task passes through five phases:
 ImperialDragonHarness/
 ├── .claude-plugin/
 │   └── plugin.json         # Plugin manifest (name, version, author)
-├── skills/                 # Slash commands: /imperial-dragon:<skill>
+├── skills/                 # Slash commands: /idh:<skill>
 │   ├── harness-rules/      # Auto-invoked rules (companion .md files)
 │   │   ├── SKILL.md
 │   │   ├── workflow.md         # Session start, escalation, worktree
@@ -66,7 +66,7 @@ This repo is an official Claude Code plugin. Load it with:
 claude --plugin-dir ./ImperialDragonHarness
 ```
 
-Skills are namespaced as `/imperial-dragon:<skill>`. Hooks fire automatically via `hooks/hooks.json`. Rules are delivered as companion files in the auto-invoked `harness-rules` skill.
+Skills are namespaced as `/idh:<skill>`. Hooks fire automatically via `hooks/hooks.json`. Rules are delivered as companion files in the auto-invoked `harness-rules` skill.
 
 ## Backed by
 

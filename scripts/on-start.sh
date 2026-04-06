@@ -44,8 +44,8 @@ if [ -n "$AGENT_GIT_EMAIL" ]; then
     git config user.email "$AGENT_GIT_EMAIL"
 fi
 
-# Activate project hooks if hooks/ directory exists
-if [ -d hooks ]; then
+# Activate project git hooks if a pre-commit hook exists
+if [ -f hooks/pre-commit ]; then
     git config core.hooksPath hooks 2>/dev/null
 fi
 
