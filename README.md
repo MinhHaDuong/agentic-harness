@@ -1,6 +1,8 @@
 # Imperial Dragon Harness
 
-User-level Claude Code harness for Minh Ha-Duong's research workflow.
+A Claude Code plugin for Minh Ha-Duong's research workflow.
+
+Install with `claude --plugin-dir /path/to/ImperialDragonHarness` or via a plugin marketplace.
 
 ## The Five Claws
 
@@ -14,48 +16,57 @@ Every task passes through five phases:
 | 4 | **Verify** | Review PR, fix, iterate ≤3 cycles |
 | 5 | **Celebrate** | Reflect, consolidate memory, dream forward |
 
-## Directory layout
+## Plugin structure
 
 ```
-~/.claude/
-├── rules/          # Always-loaded behavioral rules
-│   ├── git.md          # Git discipline (branch, commit, worktree)
-│   ├── workflow.md     # Session start, escalation, phase transitions
-│   ├── coding.md       # Python style, testing, Make patterns
-│   └── state.md         # STATE.md spec
-├── skills/         # On-demand slash commands
-│   ├── celebrate/      # Post-task wrap-up
-│   ├── end-session/    # Day wrap-up
-│   ├── memory/         # Persistent memory management
-│   ├── new-ticket/     # GitHub issue template
-│   ├── start-ticket/   # Begin work on issue (TDD)
-│   ├── review-pr/      # Multi-agent code review
-│   ├── review-pr-prose/ # Peer review panel for prose
-│   └── autonomous/     # Unsupervised exploration session
-├── hooks/          # Lifecycle scripts
-│   └── on-start.sh     # Session start: identity, env, hooks
-├── commands/       # Custom slash commands
-│   └── choose-journal.md
-├── docs/           # Reference material
-│   ├── 5 levels of harnessing.md
-│   ├── Forsythe-2026-10principles.odt
-│   ├── braindump-harness-extraction.md
-│   ├── VISION-original.md
-│   └── telemetry-scripts/
-├── settings.json   # Permissions, hooks (not tracked)
-└── .gitignore      # Track only harness components
+ImperialDragonHarness/
+├── .claude-plugin/
+│   └── plugin.json         # Plugin manifest (name, version, author)
+├── skills/                 # Slash commands: /imperial-dragon:<skill>
+│   ├── harness-rules/      # Auto-invoked rules (companion .md files)
+│   │   ├── SKILL.md
+│   │   ├── workflow.md         # Session start, escalation, worktree
+│   │   ├── git.md              # Branch, commit, PR discipline
+│   │   ├── coding.md           # Python style, testing, Make
+│   │   └── state.md            # STATE.md format spec
+│   ├── new-ticket/         # GitHub issue template
+│   ├── start-ticket/       # Begin work on issue (TDD)
+│   ├── review-pr/          # Multi-agent code review
+│   ├── review-pr-prose/    # Peer review panel for prose
+│   ├── celebrate/          # Post-task wrap-up
+│   ├── end-session/        # Day wrap-up
+│   ├── memory/             # Persistent memory management
+│   └── autonomous/         # Unsupervised exploration session
+├── hooks/
+│   └── hooks.json          # Lifecycle event handlers
+├── scripts/                # Hook implementations
+│   ├── on-start.sh             # Session start: identity, env, hooks
+│   ├── guard-destructive-bash.sh
+│   ├── guard-commit-on-main.sh
+│   ├── block-pr-merge-in-worktree.sh
+│   ├── lint-on-edit.sh
+│   ├── check-tests-on-stop.sh
+│   └── warn-stale-rules.sh
+├── commands/               # Guidance documents
+│   ├── choose-journal.md
+│   └── gsd/                    # 33 research workflow commands
+├── bin/                    # Utilities (added to PATH)
+│   ├── usage-report
+│   ├── snapshot
+│   └── install-cron
+├── settings.json           # Default settings when plugin enabled
+└── docs/                   # Reference material (not loaded)
 ```
 
 ## How it works
 
-Claude Code loads user-level (`~/.claude/`) and project-level (`.claude/`) config automatically. Precedence:
+This repo is an official Claude Code plugin. Load it with:
 
-- **Rules**: project overrides user (project adds specifics on top of generic)
-- **Skills**: user overrides project (generic skills serve as defaults)
-- **Hooks**: both run (most restrictive decision wins)
-- **Settings**: scalars — project wins; arrays — merge
+```bash
+claude --plugin-dir ./ImperialDragonHarness
+```
 
-Projects add their own rules, hooks, and project-specific skills. The harness provides the workflow skeleton.
+Skills are namespaced as `/imperial-dragon:<skill>`. Hooks fire automatically via `hooks/hooks.json`. Rules are delivered as companion files in the auto-invoked `harness-rules` skill.
 
 ## Backed by
 

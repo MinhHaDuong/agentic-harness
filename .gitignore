@@ -1,16 +1,18 @@
 # Track only the harness — ignore everything else
 *
 
-# Harness components
+# Plugin components
 !.gitignore
 !README.md
 !STATE.md
-!rules/
-!rules/**
+!.claude-plugin/
+!.claude-plugin/**
 !skills/
 !skills/**
 !hooks/
 !hooks/**
+!scripts/
+!scripts/**
 !bin/
 !bin/**
 !commands/

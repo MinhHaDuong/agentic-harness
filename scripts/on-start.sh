@@ -50,8 +50,9 @@ if [ -d hooks ]; then
 fi
 
 # Check for stale rules (advisory)
-if [ -f hooks/warn-stale-rules.sh ]; then
-    bash hooks/warn-stale-rules.sh
+_script_dir="$(cd "$(dirname "$0")" && pwd)"
+if [ -f "$_script_dir/warn-stale-rules.sh" ]; then
+    bash "$_script_dir/warn-stale-rules.sh"
 fi
 
 echo "Agent identity configured."
