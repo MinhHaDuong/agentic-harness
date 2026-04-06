@@ -1,0 +1,78 @@
+#!/usr/bin/env bash
+# Uninstall a plugin from the harness.
+#
+# Usage: plugin-uninstall <plugin-name>
+#
+# Removes symlinks, deregisters hooks from settings.json,
+# and removes the entry from plugins.json.
+set -euo pipefail
+
+CLAUDE_DIR="${CLAUDE_HOME:-$HOME/.claude}"
+PLUGINS_REGISTRY="$CLAUDE_DIR/plugins.json"
+SETTINGS="$CLAUDE_DIR/settings.json"
+
+die() { echo "Error: $*" >&2; exit 1; }
+
+[ $# -ge 1 ] || die "Usage: plugin-uninstall <plugin-name>"
+
+NAME="$1"
+
+command -v jq >/dev/null || die "jq is required but not installed"
+[ -f "$PLUGINS_REGISTRY" ] || die "No plugins registry found at $PLUGINS_REGISTRY"
+
+# Check plugin exists
+ENTRY=$(jq -r --arg n "$NAME" '.[$n] // empty' "$PLUGINS_REGISTRY")
+[ -n "$ENTRY" ] || die "Plugin '$NAME' is not installed"
+
+VERSION=$(echo "$ENTRY" | jq -r '.version')
+echo "Uninstalling plugin: $NAME v$VERSION"
+
+# --- Remove rule symlinks ---
+for rule in $(echo "$ENTRY" | jq -r '.rules[]? // empty'); do
+    target="$CLAUDE_DIR/rules/$rule"
+    if [ -L "$target" ]; then
+        rm "$target"
+        echo "  removed rule: $rule"
+    fi
+done
+
+# --- Remove skill symlinks ---
+for skill in $(echo "$ENTRY" | jq -r '.skills[]? // empty'); do
+    target="$CLAUDE_DIR/skills/$skill"
+    if [ -L "$target" ]; then
+        rm "$target"
+        echo "  removed skill: $skill"
+    fi
+done
+
+# --- Remove command symlinks ---
+for cmd in $(echo "$ENTRY" | jq -r '.commands[]? // empty'); do
+    target="$CLAUDE_DIR/commands/$cmd"
+    if [ -L "$target" ]; then
+        rm "$target"
+        echo "  removed command: $cmd"
+    fi
+done
+
+# --- Remove hooks from settings.json ---
+if [ -f "$SETTINGS" ]; then
+    SETTINGS_TMP=$(mktemp)
+    # Remove any hook entries tagged with #plugin:<name>
+    jq --arg tag "#plugin:$NAME" '
+        .hooks |= (. // {} | with_entries(
+            .value |= [.[] | select(
+                (.hooks // []) | all(.command | contains($tag) | not)
+            )]
+        ))
+    ' "$SETTINGS" > "$SETTINGS_TMP"
+    mv "$SETTINGS_TMP" "$SETTINGS"
+    echo "  removed hooks from settings.json"
+fi
+
+# --- Remove from registry ---
+REG_TMP=$(mktemp)
+jq --arg n "$NAME" 'del(.[$n])' "$PLUGINS_REGISTRY" > "$REG_TMP"
+mv "$REG_TMP" "$PLUGINS_REGISTRY"
+
+echo ""
+echo "Plugin '$NAME' uninstalled successfully."

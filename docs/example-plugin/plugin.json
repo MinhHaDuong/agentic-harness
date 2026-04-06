@@ -1,0 +1,19 @@
+{
+  "name": "example-greet",
+  "version": "0.1.0",
+  "description": "Example plugin that adds a /greet skill and a politeness rule.",
+  "rules": [
+    "rules/politeness.md"
+  ],
+  "skills": [
+    "skills/greet"
+  ],
+  "hooks": [
+    {
+      "event": "SessionStart",
+      "matcher": "",
+      "command": "hooks/hello.sh",
+      "timeout": 5
+    }
+  ]
+}

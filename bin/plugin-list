@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# List installed plugins.
+#
+# Usage: plugin-list [--json]
+set -euo pipefail
+
+CLAUDE_DIR="${CLAUDE_HOME:-$HOME/.claude}"
+PLUGINS_REGISTRY="$CLAUDE_DIR/plugins.json"
+
+command -v jq >/dev/null || { echo "Error: jq is required" >&2; exit 1; }
+
+if [ ! -f "$PLUGINS_REGISTRY" ] || [ "$(jq 'length' "$PLUGINS_REGISTRY")" -eq 0 ]; then
+    echo "No plugins installed."
+    exit 0
+fi
+
+if [ "${1:-}" = "--json" ]; then
+    jq '.' "$PLUGINS_REGISTRY"
+    exit 0
+fi
+
+echo "Installed plugins:"
+echo ""
+jq -r 'to_entries[] | "  \(.key) v\(.value.version)  (installed: \(.value.installed // "unknown"))\n    dir: \(.value.dir)\n    rules: \(.value.rules | join(", ") // "none")\n    skills: \(.value.skills | join(", ") // "none")\n    commands: \(.value.commands | join(", ") // "none")\n"' "$PLUGINS_REGISTRY"

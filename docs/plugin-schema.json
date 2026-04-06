@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Imperial Dragon Harness Plugin Manifest",
+  "description": "Declares harness components bundled in a plugin directory.",
+  "type": "object",
+  "required": ["name", "version"],
+  "additionalProperties": false,
+  "properties": {
+    "name": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]*$",
+      "description": "Lowercase kebab-case plugin identifier."
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "Semver version string."
+    },
+    "description": {
+      "type": "string",
+      "description": "One-line summary of what the plugin provides."
+    },
+    "requires": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Names of plugins this plugin depends on."
+    },
+    "rules": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Paths to rule .md files relative to plugin dir."
+    },
+    "skills": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Paths to skill directories relative to plugin dir (each must contain SKILL.md)."
+    },
+    "hooks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["event", "matcher", "command"],
+        "additionalProperties": false,
+        "properties": {
+          "event": {
+            "type": "string",
+            "enum": ["SessionStart", "PreToolUse", "PostToolUse", "Stop"],
+            "description": "Hook lifecycle event."
+          },
+          "matcher": {
+            "type": "string",
+            "description": "Tool matcher pattern (empty string matches all)."
+          },
+          "command": {
+            "type": "string",
+            "description": "Path to hook script relative to plugin dir."
+          },
+          "timeout": {
+            "type": "integer",
+            "default": 10,
+            "description": "Timeout in seconds."
+          }
+        }
+      },
+      "description": "Hooks to register in settings.json."
+    },
+    "commands": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Paths to command .md files relative to plugin dir."
+    }
+  }
+}

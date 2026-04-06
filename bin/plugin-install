@@ -1,0 +1,147 @@
+#!/usr/bin/env bash
+# Install a plugin into the harness.
+#
+# Usage: plugin-install <plugin-dir>
+#
+# Reads plugin.json from <plugin-dir> and:
+#   1. Symlinks rules/, skills/, commands/ into ~/.claude/
+#   2. Registers hooks in settings.json
+#   3. Records the installation in ~/.claude/plugins.json
+set -euo pipefail
+
+CLAUDE_DIR="${CLAUDE_HOME:-$HOME/.claude}"
+PLUGINS_REGISTRY="$CLAUDE_DIR/plugins.json"
+SETTINGS="$CLAUDE_DIR/settings.json"
+
+die() { echo "Error: $*" >&2; exit 1; }
+
+[ $# -ge 1 ] || die "Usage: plugin-install <plugin-dir>"
+
+PLUGIN_DIR="$(cd "$1" && pwd)"
+MANIFEST="$PLUGIN_DIR/plugin.json"
+[ -f "$MANIFEST" ] || die "No plugin.json found in $PLUGIN_DIR"
+
+# Require jq
+command -v jq >/dev/null || die "jq is required but not installed"
+
+NAME=$(jq -r '.name' "$MANIFEST")
+VERSION=$(jq -r '.version' "$MANIFEST")
+[ -n "$NAME" ] && [ "$NAME" != "null" ] || die "plugin.json must have a 'name' field"
+[ -n "$VERSION" ] && [ "$VERSION" != "null" ] || die "plugin.json must have a 'version' field"
+
+echo "Installing plugin: $NAME v$VERSION"
+
+# Check if already installed
+if [ -f "$PLUGINS_REGISTRY" ]; then
+    EXISTING=$(jq -r --arg n "$NAME" '.[$n] // empty' "$PLUGINS_REGISTRY")
+    if [ -n "$EXISTING" ]; then
+        die "Plugin '$NAME' is already installed. Uninstall first with: plugin-uninstall $NAME"
+    fi
+fi
+
+# Track what we install for clean uninstall
+INSTALLED_RULES=()
+INSTALLED_SKILLS=()
+INSTALLED_COMMANDS=()
+INSTALLED_HOOKS=()
+
+# --- Rules ---
+for rule in $(jq -r '.rules[]? // empty' "$MANIFEST"); do
+    src="$PLUGIN_DIR/$rule"
+    [ -f "$src" ] || die "Rule file not found: $src"
+    dest="$CLAUDE_DIR/rules/$(basename "$rule")"
+    mkdir -p "$CLAUDE_DIR/rules"
+    ln -sf "$src" "$dest"
+    INSTALLED_RULES+=("$(basename "$rule")")
+    echo "  rule: $(basename "$rule")"
+done
+
+# --- Skills ---
+for skill in $(jq -r '.skills[]? // empty' "$MANIFEST"); do
+    src="$PLUGIN_DIR/$skill"
+    [ -d "$src" ] || die "Skill directory not found: $src"
+    [ -f "$src/SKILL.md" ] || die "Skill missing SKILL.md: $src"
+    dest="$CLAUDE_DIR/skills/$(basename "$skill")"
+    mkdir -p "$CLAUDE_DIR/skills"
+    ln -sf "$src" "$dest"
+    INSTALLED_SKILLS+=("$(basename "$skill")")
+    echo "  skill: $(basename "$skill")"
+done
+
+# --- Commands ---
+for cmd in $(jq -r '.commands[]? // empty' "$MANIFEST"); do
+    src="$PLUGIN_DIR/$cmd"
+    [ -f "$src" ] || die "Command file not found: $src"
+    dest="$CLAUDE_DIR/commands/$(basename "$cmd")"
+    mkdir -p "$CLAUDE_DIR/commands"
+    ln -sf "$src" "$dest"
+    INSTALLED_COMMANDS+=("$(basename "$cmd")")
+    echo "  command: $(basename "$cmd")"
+done
+
+# --- Hooks ---
+HOOK_COUNT=$(jq '.hooks | length // 0' "$MANIFEST")
+if [ "$HOOK_COUNT" -gt 0 ]; then
+    # Ensure settings.json exists with hooks object
+    if [ ! -f "$SETTINGS" ]; then
+        echo '{"hooks":{}}' > "$SETTINGS"
+    fi
+
+    for i in $(seq 0 $((HOOK_COUNT - 1))); do
+        EVENT=$(jq -r ".hooks[$i].event" "$MANIFEST")
+        MATCHER=$(jq -r ".hooks[$i].matcher" "$MANIFEST")
+        CMD_REL=$(jq -r ".hooks[$i].command" "$MANIFEST")
+        TIMEOUT=$(jq -r ".hooks[$i].timeout // 10" "$MANIFEST")
+
+        CMD_ABS="$PLUGIN_DIR/$CMD_REL"
+        [ -f "$CMD_ABS" ] || die "Hook script not found: $CMD_ABS"
+        chmod +x "$CMD_ABS"
+
+        # Tag the hook command so we can find it during uninstall
+        TAGGED_CMD="$CMD_ABS #plugin:$NAME"
+
+        # Append hook entry to settings.json
+        SETTINGS_TMP=$(mktemp)
+        jq --arg event "$EVENT" \
+           --arg matcher "$MATCHER" \
+           --arg cmd "$TAGGED_CMD" \
+           --argjson timeout "$TIMEOUT" \
+           '.hooks[$event] = (.hooks[$event] // []) + [{
+               "matcher": $matcher,
+               "hooks": [{"type": "command", "command": $cmd, "timeout": $timeout}]
+           }]' "$SETTINGS" > "$SETTINGS_TMP"
+        mv "$SETTINGS_TMP" "$SETTINGS"
+
+        INSTALLED_HOOKS+=("$EVENT:$MATCHER")
+        echo "  hook: $EVENT ($MATCHER) -> $CMD_REL"
+    done
+fi
+
+# --- Register in plugins.json ---
+if [ ! -f "$PLUGINS_REGISTRY" ]; then
+    echo '{}' > "$PLUGINS_REGISTRY"
+fi
+
+to_json_array() {
+    if [ $# -eq 0 ]; then echo '[]'; else printf '%s\n' "$@" | jq -R . | jq -s .; fi
+}
+
+REG_TMP=$(mktemp)
+jq --arg name "$NAME" \
+   --arg version "$VERSION" \
+   --arg dir "$PLUGIN_DIR" \
+   --argjson rules "$(to_json_array "${INSTALLED_RULES[@]+"${INSTALLED_RULES[@]}"}")" \
+   --argjson skills "$(to_json_array "${INSTALLED_SKILLS[@]+"${INSTALLED_SKILLS[@]}"}")" \
+   --argjson commands "$(to_json_array "${INSTALLED_COMMANDS[@]+"${INSTALLED_COMMANDS[@]}"}")" \
+   '.[$name] = {
+       "version": $version,
+       "dir": $dir,
+       "rules": $rules,
+       "skills": $skills,
+       "commands": $commands,
+       "installed": (now | strftime("%Y-%m-%dT%H:%M:%SZ"))
+   }' "$PLUGINS_REGISTRY" > "$REG_TMP"
+mv "$REG_TMP" "$PLUGINS_REGISTRY"
+
+echo ""
+echo "Plugin '$NAME' v$VERSION installed successfully."
