@@ -14,7 +14,7 @@ Spin multiple agents in parallel, each with a distinct perspective. Run all agen
 ## Setup
 
 1. **Read the issue** linked to the PR. Note the exit criteria.
-2. **Read the diff**: `gh pr diff $ARGUMENTS`
+2. **Read the diff** of the merge request.
 3. **Assess risk level** and determine proportional depth (see table below).
 4. **Launch review agents** in parallel:
 
@@ -50,7 +50,7 @@ Spin multiple agents in parallel, each with a distinct perspective. Run all agen
 2. **Triage by confidence** — investigate low-confidence findings before posting.
 3. **Deduplicate** findings across agents.
 4. **Run tests**: `make check`
-5. **Post a single review** via `gh pr review`, attributing each finding to its perspective.
+5. **Post a single review** on the merge request, attributing each finding to its perspective.
 
 ## Code-quality escalation
 

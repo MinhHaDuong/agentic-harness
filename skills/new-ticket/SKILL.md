@@ -1,16 +1,16 @@
 ---
 name: new-ticket
-description: Create a GitHub issue as a handoff document with required sections for TDD workflow.
+description: Create a ticket as a handoff document with required sections for TDD workflow.
 disable-model-invocation: false
 user-invocable: true
 argument-hint: [title]
 ---
 
-# New ticket — create a GitHub issue
+# New ticket
 
 `[Imagine → Plan]`
 
-Issues are handoff documents. A new agent will only have the context provided.
+Tickets are handoff documents. A new agent will only have the context provided.
 
 ## Required sections
 
@@ -38,20 +38,13 @@ What problem or need this addresses. Why now.
 - Definition of done — when is this ticket complete?
 ```
 
-## Command
+Create the ticket using whatever system the project has (git-erg `tickets/` directory preferred, forge issues as fallback). The agent knows how to use the available tools.
 
-```bash
-gh issue create --title "$ARGUMENTS" --body "$(cat <<'EOF'
-<paste template above, filled in>
-EOF
-)"
-```
+## Tracking ticket convention
 
-## Tracking issue convention
+When investigation spawns sub-tickets:
 
-When investigation spawns sub-issues:
-
-1. Original issue becomes the **tracking issue** — leave it open.
-2. Create each sub-issue as a GitHub child: `gh issue create --title "..." --body "..." --parent <TRACKING_ISSUE_NUMBER>`
-3. Edit tracking issue body to add `## Sub-issues` heading listing each child.
-4. Tracking issue closes only after integration review (see `/celebrate` step 11).
+1. Original ticket becomes the **tracking ticket** — leave it open.
+2. Create each sub-ticket referencing the tracker.
+3. Edit tracking ticket to list each child.
+4. Tracking ticket closes only after integration review (see `/celebrate` step 11).

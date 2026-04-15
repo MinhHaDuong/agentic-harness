@@ -14,7 +14,7 @@ Spin disciplinary agents in parallel, each in a fresh context. Prose review read
 ## Setup
 
 1. Identify the text: which `.qmd`/`.md` files changed? What is the target venue?
-2. Read the diff: `gh pr diff $ARGUMENTS`
+2. Read the diff of the merge request.
 3. Recruit the panel: select agents appropriate for the venue and scope of changes. Always include an adversarial referee. Add a journal-specific expert if venue rules exist (check project rules).
 
 ## Each agent runs
@@ -35,7 +35,7 @@ One agent is always the **AI-tells auditor**. It reads `config/ai-tells.yml` for
 2. Group findings: major (blocks acceptance), minor (should fix), suggestion.
 3. Deduplicate convergent findings.
 4. Build the manuscript. Check consistency between prose and data.
-5. Post single review via `gh pr review`.
+5. Post a single review on the merge request.
 
 ## Proportional depth
 

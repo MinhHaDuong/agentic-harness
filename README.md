@@ -76,6 +76,10 @@ ImperialDragonHarness/
 
 Skills are available as `/celebrate`, `/review-pr`, etc. Hooks fire automatically via `settings.json`.
 
+## Ticket management
+
+The preferred ticket system is [git-erg](https://github.com/MinhHaDuong/git-erg), an offline `tickets/` directory that lives inside each project's git repo. Install it per-project following its README. When git-erg is available, use it. Fall back to GitHub issues or any other forge when needed (e.g., for cross-team coordination).
+
 ### Optional: daily auto-update via systemd
 
 To keep the harness up to date without a network hit on every session start:

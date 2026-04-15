@@ -28,8 +28,8 @@ Do not skip steps.
 
 8. **Merge to main**:
    - Detect worktree: `git rev-parse --git-common-dir` vs `git rev-parse --git-dir`. If they differ, you are in a worktree.
-   - **In a worktree**: do NOT run `git switch main` — it will fail. Instead push the branch and merge via PR (`gh pr create` then `gh pr merge --ff-only`), or for chore-level work push directly: `git push origin HEAD:main`.
-   - **Not in a worktree**: feature work through PR. Chores merge locally via short-lived branch + fast-forward.
+   - **In a worktree**: do NOT run `git switch main` — it will fail. Push the branch and merge via merge request, or for chore-level work push directly: `git push origin HEAD:main`.
+   - **Not in a worktree**: feature work through merge request. Chores merge locally via short-lived branch + fast-forward.
 9. **Push** and **clean up**: delete remote branch after merge.
 10. **Close** the ticket if still open.
 11. **Check for tracking ticket**: if the closed ticket has a parent, check whether all sibling sub-tickets are now closed.
@@ -38,5 +38,5 @@ Do not skip steps.
 12. **Exit worktree** (if in one): call `ExitWorktree` with action `remove`. Skip if not in a worktree.
 13. **Verify hygiene**:
     - `git branch -a` → no stale remote branches
-    - `gh pr list` → no stale PRs
+    - Check for stale merge requests
 14. **Offer** to improve workflow rules if lessons were learned.
