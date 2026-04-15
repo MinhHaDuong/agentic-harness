@@ -1,8 +1,6 @@
 # Imperial Dragon Harness
 
-A Claude Code plugin for Minh Ha-Duong's research workflow.
-
-Install with `claude --plugin-dir /path/to/ImperialDragonHarness` or via a plugin marketplace.
+A Claude Code harness for Minh Ha-Duong's research workflow. Lives as `~/.claude`.
 
 ## The Five Claws
 
@@ -16,13 +14,13 @@ Every task passes through five phases:
 | 4 | **Verify** | Review PR, fix, iterate ≤3 cycles |
 | 5 | **Celebrate** | Reflect, consolidate memory, dream forward |
 
-## Plugin structure
+## Structure
 
 ```
 ImperialDragonHarness/
 ├── .claude-plugin/
-│   └── plugin.json         # Plugin manifest (name, version, author)
-├── skills/                 # Slash commands: /idh:<skill>
+│   └── plugin.json         # Plugin manifest (kept for future use)
+├── skills/                 # Slash commands: /celebrate, /review-pr, etc.
 │   ├── harness-rules/      # Auto-invoked rules (companion .md files)
 │   │   ├── SKILL.md
 │   │   ├── workflow.md         # Session start, escalation, worktree
@@ -36,17 +34,16 @@ ImperialDragonHarness/
 │   ├── celebrate/          # Post-task wrap-up
 │   ├── end-session/        # Day wrap-up
 │   ├── memory/             # Persistent memory management
+│   ├── orchestrator/       # Batch across multiple tickets
 │   └── autonomous/         # Unsupervised exploration session
 ├── hooks/
-│   └── hooks.json          # Lifecycle event handlers
+│   └── hooks.json          # Plugin-mode hooks (mirrors settings.json)
 ├── scripts/                # Hook implementations
-│   ├── on-start.sh             # Session start: identity, env, hooks
+│   ├── on-start.sh             # Session start: env loading, worktree gate
 │   ├── guard-destructive-bash.sh
 │   ├── guard-commit-on-main.sh
 │   ├── block-pr-merge-in-worktree.sh
-│   ├── lint-on-edit.sh
-│   ├── check-tests-on-stop.sh
-│   └── warn-stale-rules.sh
+│   └── lint-on-edit.sh
 ├── commands/               # Guidance documents
 │   ├── choose-journal.md
 │   └── gsd/                    # 33 research workflow commands
@@ -54,19 +51,30 @@ ImperialDragonHarness/
 │   ├── usage-report
 │   ├── snapshot
 │   └── install-cron
-├── settings.json           # Default settings when plugin enabled
+├── settings.json           # Hooks, permissions, env vars
 └── docs/                   # Reference material (not loaded)
 ```
 
 ## Installation
 
-Load the plugin with:
+1. Clone the repo as your `~/.claude` directory:
+   ```bash
+   git clone https://github.com/MinhHaDuong/ImperialDragonHarness.git ~/.claude
+   ```
 
-```bash
-claude --plugin-dir ./ImperialDragonHarness
-```
+2. Create `~/.claude/.env` with your API keys (this file is gitignored):
+   ```
+   ANTHROPIC_API_KEY=sk-...
+   OPENAI_API_KEY=sk-...
+   ```
 
-Skills are namespaced as `/idh:<skill>`. Hooks fire automatically via `hooks/hooks.json`. Rules are delivered as companion files in the auto-invoked `harness-rules` skill.
+3. Add the shell alias to your `~/.bashrc` (or `~/.zshrc`):
+   ```bash
+   alias claude='claude --dangerously-skip-permissions'
+   ```
+   The harness enforces worktree isolation via a SessionStart hook, so every new chat automatically enters its own worktree.
+
+Skills are available as `/celebrate`, `/review-pr`, etc. Hooks fire automatically via `settings.json`.
 
 ### Optional: daily auto-update via systemd
 
@@ -102,6 +110,15 @@ systemctl --user daemon-reload
 systemctl --user enable --now claude-harness-pull.timer
 ```
 
-## Backed by
+## Why not a plugin?
 
-https://github.com/MinhHaDuong/ImperialDragonHarness
+Claude Code supports a plugin system (`--plugin-dir`, `.claude-plugin/`, namespaced skills). This repo has plugin scaffolding but is not used as a plugin. Instead, it *is* the `~/.claude` directory.
+
+Reasons:
+
+- **Hooks and settings live in `~/.claude/settings.json`**. A plugin can ship `hooks.json` and its own settings, but user-level hooks and `env` vars must be in the user config directory. Running as `~/.claude` means one source of truth.
+- **Memory and state are user-level**. The `projects/` memory directory and `.env` file belong in `~/.claude`. A plugin would need symlinks or copies.
+- **No namespace friction**. As `~/.claude`, skills register as `/celebrate`, not `/idh:celebrate`. Shorter to type, easier to remember.
+- **Simpler mental model**. "The harness is my Claude config" vs. "the harness is a plugin loaded into my Claude config."
+
+The plugin manifest (`.claude-plugin/plugin.json`) is kept for potential future use — loading the harness on machines where `~/.claude` already exists for other purposes.

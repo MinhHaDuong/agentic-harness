@@ -56,17 +56,6 @@
         ]
       }
     ],
-    "Stop": [
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/scripts/check-tests-on-stop.sh",
-            "timeout": 10
-          }
-        ]
-      }
-    ]
+    "Stop": []
   }
 }
