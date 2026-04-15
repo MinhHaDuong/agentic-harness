@@ -25,6 +25,10 @@ Spin disciplinary agents in parallel, each in a fresh context. Prose review read
 
 Agents with relevant expertise should use available tools (web search for literature, linting tools if installed, etc.).
 
+## AI-tells auditor (always included)
+
+One agent is always the **AI-tells auditor**. It reads `config/ai-tells.yml` for blacklisted words, phrases, conditional words, density limits, and patterns to flag. It scans the full text (not just the diff) and reports every violation with line number, context, and severity. This agent has no other role — it is a specialized lint pass.
+
 ## Synthesis
 
 1. Preserve dissent verbatim.

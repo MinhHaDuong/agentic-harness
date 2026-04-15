@@ -12,7 +12,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "$HOME/.claude/hooks/on-start.sh",
+            "command": "$HOME/.claude/scripts/on-start.sh",
             "timeout": 30
           }
         ]
@@ -24,7 +24,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "$HOME/.claude/hooks/guard-destructive-bash.sh",
+            "command": "$HOME/.claude/scripts/guard-destructive-bash.sh",
             "timeout": 5
           }
         ]
@@ -34,7 +34,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "$HOME/.claude/hooks/guard-commit-on-main.sh",
+            "command": "$HOME/.claude/scripts/guard-commit-on-main.sh",
             "timeout": 5
           }
         ]
@@ -44,7 +44,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "$HOME/.claude/hooks/block-pr-merge-in-worktree.sh",
+            "command": "$HOME/.claude/scripts/block-pr-merge-in-worktree.sh",
             "timeout": 5
           }
         ]
@@ -56,7 +56,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "$HOME/.claude/hooks/lint-on-edit.sh",
+            "command": "$HOME/.claude/scripts/lint-on-edit.sh",
             "timeout": 15
           }
         ]
