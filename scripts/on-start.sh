@@ -9,7 +9,7 @@ if [ ! -f "$_harness_stamp" ] || [ "$(cat "$_harness_stamp")" != "$_today" ]; th
     git -C "$HOME/.claude" pull --ff-only --quiet 2>/dev/null && echo "$_today" > "$_harness_stamp"
 fi
 
-# Persist .env vars to CLAUDE_ENV_FILE (survives hook exit)
+# Persist .env vars to CLAUDE_ENV_FILE (fresh each session, no dedup needed)
 persist_env() {
     local envfile="$1"
     [ -f "$envfile" ] || return 0
@@ -45,14 +45,6 @@ fi
 # GH_TOKEN alias (gh CLI needs this specific name)
 if [ -n "$AGENT_GH_TOKEN" ] && [ -n "$CLAUDE_ENV_FILE" ]; then
     echo "GH_TOKEN=$AGENT_GH_TOKEN" >> "$CLAUDE_ENV_FILE"
-fi
-
-# Set agent identity
-if [ -n "$AGENT_GIT_NAME" ]; then
-    git config user.name "$AGENT_GIT_NAME"
-fi
-if [ -n "$AGENT_GIT_EMAIL" ]; then
-    git config user.email "$AGENT_GIT_EMAIL"
 fi
 
 # Activate project git hooks if a pre-commit hook exists
