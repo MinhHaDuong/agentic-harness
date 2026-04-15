@@ -28,6 +28,10 @@ fi
 # The worktree instruction must always print, regardless of project dir
 echo "Worktree isolation is enabled for this project. Every new conversation must start in its own worktree. Use EnterWorktree as your first action before responding to the user."
 
+# --- Nothing below this line may produce stdout (hook output = conversation context) ---
+# Redirect stdout+stderr to /dev/null for the rest of the script
+exec >/dev/null 2>&1
+
 # Everything below requires a project directory
 [ -n "$CLAUDE_PROJECT_DIR" ] && cd "$CLAUDE_PROJECT_DIR" || exit 0
 
@@ -41,7 +45,6 @@ fi
 # GH_TOKEN alias (gh CLI needs this specific name)
 if [ -n "$AGENT_GH_TOKEN" ] && [ -n "$CLAUDE_ENV_FILE" ]; then
     echo "GH_TOKEN=$AGENT_GH_TOKEN" >> "$CLAUDE_ENV_FILE"
-    export GH_TOKEN="$AGENT_GH_TOKEN"
 fi
 
 # Set agent identity
@@ -54,10 +57,10 @@ fi
 
 # Activate project git hooks if a pre-commit hook exists
 if [ -f hooks/pre-commit ]; then
-    git config core.hooksPath hooks 2>/dev/null
+    git config core.hooksPath hooks
 fi
 
-# Check for stale rules (advisory)
+# Check for stale rules (advisory — output suppressed)
 _script_dir="$(cd "$(dirname "$0")" && pwd)"
 if [ -f "$_script_dir/warn-stale-rules.sh" ]; then
     bash "$_script_dir/warn-stale-rules.sh"
