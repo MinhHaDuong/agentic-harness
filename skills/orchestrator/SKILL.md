@@ -110,11 +110,14 @@ Check each merge request for scope creep:
 - [ ] Self-reviewed at least one merge request?
 - [ ] `make check` passes on main?
 
+Autonomous mode: ralph loop to next wave.
+
 ## Wrap up
 
 1. `make check` on main — compare against baseline. New failures → ticket.
 2. Clean up worktrees.
-3. All work pushed, merge requests open.
+3a. Interactive mode: All work pushed, merge requests open.
+3b. Autonomous mode: All merge requests merged, main green.
 4. Write briefing (session log + merge request list + test delta).
 5. Do NOT run `/end-session`.
 
