@@ -78,24 +78,31 @@ Each agent follows `/start-ticket` workflow. Push branch when done, create merge
 
 Wait for wave to complete.
 
-## Phase 6: Verify (per-ticket `/review-pr`)
+## Phase 6: Verify (per-ticket `/verify`)
 
-Mood: Be strict, Skeptical, nit-picky, detail-oriented, aim for code excellence and integrity.
-Verify with proportional depth, the autonomous mode default is all of the following.
+Mood: Be strict, skeptical, nit-picky, detail-oriented. Aim for code excellence and integrity.
 
-Review each executed ticket :
-- Check adherence to coding rules and architecture.md.
-- Use the `\review` built-in tool
-- Use either the `\review-pr` or `\review-pr-prose` skill.
-- Use the `\simplify` built-in tool
+**Per-ticket:** invoke `/verify <pr-number>` on each merge request. The skill runs:
 
-Review the wave as a whole:
-- Subagent specifically instructed to check for integration and testing at merge time, not just code quality.
+1. `/verify-adherence` — mechanical-first rule check (tests + grep ratchet before LLM).
+2. `/review` (built-in) — standard review.
+3. `/review-pr` or `/review-pr-prose` — file-type heuristic.
+4. `/simplify` — reuse/quality/efficiency, applies fixes.
+5. `/verify-gate` — anti-rubber-stamp merge gate: APPROVED / REROLL / ESCALATE.
+6. On REROLL (round 1 only), `/verify` spawns a fix agent and re-gates; round 2 escalates.
 
-Launch fix agents (`isolation: "worktree"`) for all findings. No nit is too small to fix.
+`/verify` never merges. The orchestrator does not either — merges are always the
+author's call (interactive) or the `/celebrate` flow's call (autonomous).
 
-In autonomous unattended mode, merge when all fixes are applied and verified, and an independent Sonnet subagent reviewer approves.
-In interactive mode, author reviews fixes and merges when ready.
+**Per-wave:** after all per-ticket `/verify` runs complete, launch one integration-review
+subagent (read-only) to check:
+- Do the merged/merge-pending PRs compose without contradiction?
+- Does `make check` still pass if we imagine them all merged?
+- Are there testing gaps visible only at wave granularity (e.g., two PRs touching the
+  same test file in incompatible ways)?
+
+Wave-level findings go to the human as a wave-summary comment; they do not block
+individual `/verify` verdicts.
 
 ## Phase 7: Scope audit
 
