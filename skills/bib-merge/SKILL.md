@@ -134,7 +134,16 @@ four outcomes by checking in order:
      and lowercase for comparison.
    - Year: the four-digit token in `year`.
    Scan existing `refs.bib` for an entry whose normalized
-   first-author surname and year match. If found:
+   first-author surname and year match. If found, confirm the
+   match using DOI or title similarity:
+   - If both entries have a DOI and they match → confirmed dedupe.
+   - If DOIs differ → not a dedupe (different work). Proceed to
+     step 2 (key collision).
+   - If no DOI on either side, compare titles: lowercase both,
+     strip punctuation and whitespace, compute token overlap. If
+     ≥50% of tokens are shared → confirmed dedupe. Otherwise →
+     different work, proceed to step 2.
+   On confirmed dedupe:
    - Mark the note entry as **deduped**.
    - Propose the existing `refs.bib` key as the canonical one.
    - Run the field-conflict check (step 5). If a conflict is
@@ -282,9 +291,10 @@ outcome appears in the report.
 - **Matching first author by full name.** Middle initials,
   initials-vs-full-first-name, and accent encodings vary between
   BibTeX sources. Match on normalized surname (ASCII-fold,
-  lowercase) + four-digit year only. A surname collision with a
-  genuinely different work is rare and gets caught by DOI
-  comparison at the conflict step.
+  lowercase) + four-digit year only. When no DOI is available on
+  either side, title similarity (≥50% token overlap) is the
+  tiebreaker. Below the threshold, the entries are treated as
+  different works and the note's key is suffix-bumped.
 - **Minting keys the project's style does not use.** If the
   library is `zotero8`, this skill does not invent an 8-char key
   — it keeps the note's `AuthorYEAR` key and flags the style
