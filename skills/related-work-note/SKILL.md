@@ -330,18 +330,20 @@ know the source language.
   number       = {42},
   pages        = {100--115},
   doi          = {10.xxxx/yyyy},
-  eprint       = {https://hal.science/hal-XXXXXXXX},
+  eprint       = {hal-XXXXXXXX},
+  eprinttype   = {hal},
 }
 
 % Non-English example:
-@inproceedings{Müller2023:klimaschutz,
+@inproceedings{Muller2023:klimaschutz,
   author       = {Müller, K.},
   title        = {Ursprünglicher Titel [{Original} title in {English}]},
   booktitle    = {Conference Name},
   date         = {2023-07-07},
   location     = {City},
   doi          = {10.xxxx/yyyy},
-  eprint       = {https://hal.science/hal-XXXXXXXX},
+  eprint       = {hal-XXXXXXXX},
+  eprinttype   = {hal},
 }
 
 % ... more entries ...
@@ -353,8 +355,7 @@ Style notes (aligned with `~/CNRS/html/src/Ha-Duong.bib`):
   `location` (not `address`).
 - Use `eprint` for HAL/arXiv links alongside `doi`.
 - Field values aligned with padding (max-width column for field names).
-- Omit `url` when `doi` is present (the DOI is the stable link).
-```
+- Omit `url` when `doi` resolves to open-access full text. Keep both when the DOI gates a paywall and `url` points to an open copy.
 
 ## Notes on style
 
