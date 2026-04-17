@@ -1,11 +1,14 @@
 %erg v1
 Title: Post-hoc validator skill — re-resolve every DOI/URL in a related-work-note output
-Status: open
+Status: closed
 Created: 2026-04-17
 Author: claude
 
 --- log ---
 2026-04-17T09:50Z claude created — migrated from ImperialDragonHarness#32 after realising IDH uses local .erg tickets for intra-project coordination (FORMAT.md). GH issue closed with pointer here.
+2026-04-17T12:27Z claude claimed
+2026-04-17T12:27Z claude note drafted skills/related-work-note-validate/SKILL.md
+2026-04-17T12:27Z claude status closed exit criteria met
 
 --- body ---
 ## Context
