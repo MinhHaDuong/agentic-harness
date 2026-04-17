@@ -372,6 +372,18 @@ Style notes (aligned with `~/CNRS/html/src/Ha-Duong.bib`):
 - Keep the note self-contained: a reader should not need access to
   anything else in the repo to judge the cited works.
 
+## Toolchain
+
+The project uses **biblatex** (not BibTeX) compiled with **biber**.
+Local `.bib` files in the repo are staging areas, not the canonical
+library. The canonical library is **Zotero** (currently v9+).
+
+At manuscript submission, approved entries must be imported into
+Zotero (File → Import the `.bib`, then attach fulltext PDFs). This
+is the author's responsibility — the skill does not automate it.
+The `/bib-merge` skill handles the intermediate step (note →
+local `.bib`); Zotero import is the final step.
+
 ## Failure modes to avoid
 
 - Drafting a note with fewer than two "Related but not cited"
