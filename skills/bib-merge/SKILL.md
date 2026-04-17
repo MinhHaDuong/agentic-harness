@@ -324,3 +324,7 @@ outcome appears in the report.
 - Modifying the note file in any way. The note is input-only.
 - CI / pre-commit hook integration. This is a manual skill
   invoked after author approval.
+- Zotero import. This skill writes to the local `refs.bib` (staging).
+  The canonical library is Zotero. At manuscript submission, the
+  author imports `refs.bib` into Zotero (File → Import) and attaches
+  fulltext PDFs. This skill does not automate that step.
