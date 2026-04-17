@@ -71,40 +71,53 @@ Both checks are intentionally cheap. If either exceeds the 10 s budget,
 ESCALATE rather than silently trimming scope (a trimmed check that drops
 a failing test is worse than no check).
 
-### 1. Mechanical suite (never skip)
+### 1. Adherence test suite (never skip)
 
-Run the hygiene + discipline tests. These are cheap and definitive:
+Run every test marked `@pytest.mark.adherence`:
 
 ```bash
-uv run python -m pytest \
-    tests/test_script_hygiene.py \
-    tests/test_io_discipline.py \
-    tests/test_schema_contracts.py \
-    -q
+uv run python -m pytest -m adherence -q
 ```
 
-Plus any other test files whose names start with `test_hygiene_` or `test_discipline_`.
+Adherence tests are pytest tests that encode project-specific rules
+(hygiene, discipline, contracts, grep-based checks). They are selected
+by the `adherence` marker, not by filename. Any test in any file can
+contribute by adding `@pytest.mark.adherence` or setting
+`pytestmark = pytest.mark.adherence` at module level.
+
+Projects register the marker in `pyproject.toml`:
+
+```toml
+[tool.pytest.ini_options]
+markers = [
+    "adherence: project rule enforcement (hygiene/discipline/contracts)",
+]
+```
 
 Failures here are **blocking**. Record each as `{test_id, rule_ref, file:line}`.
 
-### 2. Grep ratchet (the cheap, fast rules)
+**Transitional fallback.** Projects that have not yet adopted the marker
+are picked up by the old filename convention (`test_hygiene_*.py`,
+`test_discipline_*.py`, `test_schema_contracts.py`). A project is fully
+migrated when every such file carries the marker and `pytest -m adherence`
+matches the full suite. Drop the fallback per project once migrated.
 
-Run a bank of `rg` patterns. Each pattern corresponds to a single rule and carries the
-rule reference explicitly. Run against the diff (not the whole repo) via
-`git diff main...HEAD --name-only | xargs rg -n PATTERN`.
+### 2. Grep rules live as adherence tests (no central bank)
 
-Minimum starting bank (extend as rules get mechanized):
+Grep-based checks are just adherence tests that call `rg` or use a regex
+internally. They live in the target repo as `@pytest.mark.adherence`
+tests — not in this skill. The harness does not maintain a central grep
+bank; each project owns its patterns as code.
 
-| Rule | Pattern | Rule ref |
-|------|---------|----------|
-| `fig.savefig(` forbidden (use `save_figure`) | `rg 'fig\.savefig\('` | `architecture.md` rule 5 |
-| Direct corpus reads forbidden | `rg 'pd\.read_(csv\|feather).*refined_(works\|embeddings\|citations)'` | `architecture.md` rule 9 |
-| Hardcoded random seed | `rg '(seed\s*=\s*42\|RandomState\(42\))'` | `architecture.md` rule 7 |
-| `print(` in non-script modules | `rg 'print\(' scripts/_` | `coding.md` logging rule |
-| Bare `logging.getLogger` | `rg 'logging\.getLogger'` | `coding.md` logging rule |
-| Hardcoded `"data/catalogs"` paths | `rg '"data/catalogs/'` | `architecture.md` data location |
+**Why tests instead of a YAML bank.** A pytest test can scope its grep
+(diff-only vs whole-repo), attach fixtures, explain the rule in an
+assertion message, and evolve without changing a harness interface. A
+central YAML/grep bank would force a framework for one beneficiary until
+a second project arrives wanting the same mechanism.
 
-Failures here are **blocking**. Record as `{pattern, rule_ref, file:line}`.
+When `/verify` or a review surfaces a rule worth mechanizing, write a
+`@pytest.mark.adherence` test in the target repo. That is the ratchet
+in practice.
 
 ### 3. Semantic subagent (fallback only)
 
@@ -149,9 +162,10 @@ untested_rules:
 
 After each run, if `semantic_findings` is non-empty:
 
-1. The caller (`/verify` or author) opens a small follow-up ticket: "Mechanize adherence
-   rule X per suggested_test."
-2. That ticket converts the LLM check into a test in `tests/test_hygiene_<rule>.py`.
+1. The caller (`/verify` or author) opens a small follow-up ticket in the target repo:
+   "Mechanize adherence rule X per suggested_test."
+2. That ticket adds a `@pytest.mark.adherence` test (in any existing test file, or a
+   new one) that asserts the rule mechanically.
 3. Next invocation of `/verify-adherence`, the rule is caught by phase 1 instead of
    phase 3. LLM surface shrinks permanently.
 
@@ -164,8 +178,6 @@ This ratchet is the whole point. Do not accept `semantic_findings` as a steady s
 - Phase 1 fails to run (env broken) → ESCALATE; don't fall through.
 - Semantic subagent output lacks `file:line` or `suggested_test` → reject the output and
   flag as adherence-infrastructure bug. Don't silently accept.
-- Grep bank explodes in size (>30 patterns) → migrate patterns to proper pytest files and
-  trim.
 
 ## Not in scope
 
