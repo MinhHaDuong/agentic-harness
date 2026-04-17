@@ -26,7 +26,7 @@ argument-hint: <ticket-id>
 9. Pre-PR self-gate: run `/verify-adherence <branch>` (the branch created in step 4).
    - Clean → proceed to step 10 and pass `--label verify:adherence-passed` to `gh pr create`. The label signals to the downstream `/verify` merge gate that the mechanical adherence phase already ran clean and can be skipped on its next pass.
    - Blockers → decide per blocker:
-     - Cheap and mechanical (obvious fix, no design judgement) → fix in place, re-run `make check` and `/verify-adherence`, then proceed only once clean.
+     - Cheap and mechanical (obvious fix, no design judgement) → fix in place, re-run `make check` and `/verify-adherence`, then proceed only once clean. Up to 2 fix-and-recheck cycles; if still not clean after 2 rounds, escalate.
      - Otherwise → STOP. Do not open the PR. Escalate with the adherence report and the blocker list.
    - Circuit breaker: if `/verify-adherence` itself errors, times out, or returns an unparseable result → ESCALATE. Do not open the PR and do not silently skip the gate.
 10. Push the branch and open a merge request with `gh pr create ... --label verify:adherence-passed`.
