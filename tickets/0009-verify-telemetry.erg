@@ -1,0 +1,41 @@
+%erg v1
+Title: /verify emits runtime + cost telemetry
+Status: open
+Created: 2026-04-17
+Author: user
+
+--- log ---
+2026-04-17T10:00Z claude created from verify reflection memo (PR 692)
+
+--- body ---
+## Context
+
+PR 692's `/verify` run took ~3 min wall time with no progress signal.
+A runaway run would look identical to a healthy one. Users need
+calibration data to distinguish.
+
+## Actions
+
+1. `/verify` emits a single footer line on its verdict comment:
+   ```
+   telemetry: wall=<seconds>s agents=<n> tokens=<in+out> cost≈$<usd>
+   ```
+2. Per-phase timing logged to stderr during the run (not posted to PR).
+3. Abort thresholds:
+   - Wall > 15 min → post `verify: slow run` warning, continue.
+   - Wall > 30 min → ESCALATE (likely runaway).
+   - Token usage > 500k → post `verify: token-heavy run` warning, continue.
+   - Token usage > 1M → ESCALATE.
+4. Thresholds are config, not hardcoded.
+
+## Test
+
+Run verify on a small PR and confirm the telemetry line appears.
+Inject an artificial delay and confirm the slow-run threshold triggers.
+
+## Exit criteria
+
+- Every verdict comment includes a telemetry footer.
+- Slow/token-heavy runs produce warnings without aborting.
+- Runaway runs ESCALATE cleanly.
+- Memo-2 "runtime + cost telemetry" addressed.

@@ -1,0 +1,84 @@
+%erg v1
+Title: /verify ends with a structured report of actions taken + gate verdict
+Status: open
+Created: 2026-04-17
+Author: user
+
+--- log ---
+2026-04-17T10:30Z claude created from explicit user ask mid-ticket-batch
+
+--- body ---
+## Context
+
+The `/verify` skill should terminate with an unambiguous report: both
+(a) what phases ran and what they changed, and (b) the `/verify-gate`
+verdict. Today `SKILL.md` documents a verdict-comment template, but
+leaves the "what happened before the verdict" implicit.
+
+The user's explicit framing: *"I want the skill to end with a report
+of what was done, and what the verify-gate agent says."*
+
+## Actions
+
+1. Update `skills/verify/SKILL.md` "Output shape" section to two
+   top-level sections, always both present:
+
+   **Part A — Actions taken** (skill own-report):
+   ```
+   ## /verify actions
+
+   round: <n>
+   adherence: <PASS|FAIL> — <n_blocking> blocking, <n_nit> nits
+     new grep matches: [<rule-refs>]
+     tests run: <n_pass> pass, <n_fail> fail
+     pre-existing failures on main: <n>
+   review-pr: <n_comments_posted>
+   review: <posted|skipped>
+   simplify: <n_fixes_applied>
+     files touched: [<paths>]
+   fix agent (if round 2): <n_commits> commits, <last sha>
+   wall time: <s>s
+   ```
+
+   **Part B — Gate verdict** (verbatim from `/verify-gate`):
+   ```
+   ## /verify-gate verdict
+
+   verdict: <APPROVED|REROLL|ESCALATE>
+   <rest of the verify-gate YAML-ish output>
+   ```
+
+2. The two sections are always posted to the PR as a single top-level
+   comment, even on ESCALATE. On APPROVED the comment is the
+   "ship it" signal. On REROLL the comment says exactly why the
+   bounce happened.
+
+3. `--force-approve` still posts the same two-section report, with
+   Part A annotated `FORCE-APPROVED by <reason>` and Part B showing
+   the gate's *would-have-been* verdict before override.
+
+## Relationship to 0009
+
+Ticket 0009 (telemetry) adds a single-line footer to the verdict
+comment. This ticket defines the *shape* of the comment itself.
+0009 fits inside 0010's Part A as a `wall time: ...` and
+`tokens: ...` line.
+
+## Test
+
+Run `/verify` on a known PR. Assert:
+- Comment has both `## /verify actions` and `## /verify-gate verdict`
+  headers.
+- Part A lists every phase that ran (or was skipped) with an explicit
+  counter.
+- Part B is a copy of the gate's structured output, no paraphrase.
+
+## Exit criteria
+
+- `skills/verify/SKILL.md` "Output shape" documents both sections.
+- The two sections are always posted together.
+- The report is the only top-level PR comment posted by `/verify` in
+  a round (no interim "started" / "finished" chatter — the final
+  report is the signal).
+- L2 claim comment from 0001 still posted at start, but it's a
+  lock announcement, not a report.

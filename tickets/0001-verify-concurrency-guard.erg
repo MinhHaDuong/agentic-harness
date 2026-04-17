@@ -1,0 +1,90 @@
+%erg v1
+Title: /verify three-layer concurrency guard (file + label + counter)
+Status: open
+Created: 2026-04-17
+Author: user
+
+--- log ---
+2026-04-17T10:00Z claude created
+2026-04-17T10:00Z claude note migrated from Climate_finance ticket 0079 (misfiled) and IDH issue #34
+
+--- body ---
+## Context
+
+`/verify` has no concurrency control. Two parallel `/verify <same-pr>`
+invocations across chats or machines would double-comment, race on
+fix-agent commits, and defeat the two-round cap. Surfaced 2026-04-17
+when tickets 0067–0070 were each verified in separate chats.
+
+## Threat model
+
+| Failure mode | Consequence |
+|-------------|-------------|
+| Double comment posts | PR conversation cluttered, reviewers confused |
+| Double fix-agent commits | force-push collision or merge conflict; lost work |
+| Double gate verdicts | round counter defeated; ambiguous state |
+| Idempotency break | re-running a "stuck" round re-executes fix logic |
+
+## Design: three-layer coordination
+
+**L1 — Local file lock `.git/verify-wip/<pr>.wip`.** Cheap, matches existing
+`.git/ticket-wip/<ID>.wip` convention. Atomic `O_EXCL` create; 30-min staleness
+check; JSON contents `{pr, round, session_id, started_at, skill_sha}`.
+Prevents same-machine same-user race (most likely case).
+
+**L2 — GitHub label + claim comment.** Cross-machine authority.
+- Label `verify:round-<n>`.
+- Claim comment `"/verify: round=<n> started by <session_id>, skill sha: <idh-head>, expected completion: <+30 min>"`.
+- Check labels on start; if present and last claim-comment < 30 min → abort with URL; else force-take.
+- Release label on verdict.
+
+**L3 — Monotonic round counter in `/verify-gate`.** Before emitting round-N
+verdict, scan PR comments for highest `round=<k>` seen. If N ≤ k → escalate.
+Catches timing-window leaks where L1+L2 briefly disagreed.
+
+**Idempotency (design goal, not a layer).** Damage containment if L1+L2+L3 all
+race. Fix-agent commits should be content-addressed; gate verdicts should be
+commutative.
+
+## Actions
+
+1. Patch `skills/verify/SKILL.md`: add phase 0.5 (L1) + 0.6 (L2), phase 6.5 release.
+2. Patch `skills/verify-gate/SKILL.md`: L3 check + standalone mode uses
+   `verify:gate-only` label.
+3. Update `skills/orchestrator/SKILL.md` Phase 6 to surface claim-URL on abort.
+4. Register labels `verify:round-1`, `verify:round-2`, `verify:gate-only` on
+   target repos (or document the convention).
+
+## Edge cases
+
+- `--force-approve` clears L1 file + L2 label.
+- Round 2 re-entry: transition `verify:round-1` → `verify:round-2`.
+- Clock skew: use `gh api` server timestamps for staleness, not local clock.
+
+## Rejected alternatives
+
+comment-only lock (no clean release), PR draft toggle (overloads semantics),
+review-state mutex (noise), PR body append (edit race), git notes (invisible),
+redis (infra), orchestrator-only enforcement (kills common case).
+
+## Test plan (manual)
+
+1. L1 smoke: two chats same machine → second aborts with file path.
+2. L2 smoke: delete L1 file, retry elsewhere → second aborts with URL.
+3. Stale recovery: 35-min-old lock → force-take with warning comment.
+4. L3 race: two concurrent round=1 → `/verify-gate` escalates on second.
+5. `--force-approve` with active lock: L1 + L2 both cleared.
+6. Round 2 transition clean.
+
+## Exit criteria
+
+- Two parallel `/verify` on same PR: second aborts with clear reference.
+- Round 2 re-entry transitions cleanly.
+- `--force-approve` clears all locks.
+- Stale locks (≥ 30 min) force-take with audit trail.
+- L3 counter prevents round 3 even when L1+L2 race.
+
+## Priority
+
+Not blocking any specific work, but should land before the next
+multi-chat `/verify` batch.

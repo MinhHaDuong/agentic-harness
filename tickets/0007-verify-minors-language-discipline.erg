@@ -1,0 +1,44 @@
+%erg v1
+Title: /verify minors — verifiable / consider / nofollow language discipline
+Status: open
+Created: 2026-04-17
+Author: user
+
+--- log ---
+2026-04-17T10:00Z claude created from verify reflection memo (PR 691)
+
+--- body ---
+## Context
+
+Review prose like "Asymmetric NaN handling — Wave C joins on
+(year, window) will mismatch" is either testable now (then it's
+blocker-grade with evidence) or a hypothesis (then it should be
+marked as such). The current ambiguous middle ground encourages
+cosmetic fixes that don't touch the underlying claim, defeating the
+gate's purpose.
+
+## Actions
+
+1. `/review-pr` and `/review-pr-prose` tag minor findings as one of:
+   - `verifiable:` has a current failing assertion attached
+   - `consider:` hypothesis worth a comment but not enforced
+   - `nofollow:` intentionally not pursued
+2. `/verify-gate` refuses to use ambiguous "this might break X"
+   language. Either tag it `verifiable:` and attach the failing test,
+   or downgrade to `consider:`.
+3. Gate's decision rules treat `verifiable:` as blocker-adjacent (must
+   address), `consider:` as informational (does not bounce), `nofollow:`
+   as mute.
+
+## Test
+
+A minor finding without a reproducible assertion should not bounce the
+PR but should appear in the verify comment as `consider:` rather than
+as a numbered concern.
+
+## Exit criteria
+
+- `/review-pr` and `/review-pr-prose` emit tagged minors.
+- `/verify-gate` enforces tagging (rejects ungrounded "X will break").
+- Verify comment visibly uses the three prefixes.
+- Memo-1 "ticket F" addressed.

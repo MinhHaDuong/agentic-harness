@@ -1,0 +1,55 @@
+%erg v1
+Title: verify-adherence ratchet for statistical antipatterns
+Status: open
+Created: 2026-04-17
+Author: user
+
+--- log ---
+2026-04-17T10:00Z claude created from verify reflection memo (PR 691)
+
+--- body ---
+## Context
+
+The ticket-0069 blocker (Climate_finance PR 691) was a textbook
+"with-replacement sample collapsed by `set()`" bug:
+`rng.choice(n, k, replace=True)` followed by `set(...)` drops
+multiplicities and yields a ~63% (1 − 1/e) subsample. Passed all 122
+unit + smoke tests because tests asserted schema, not sampling semantics.
+
+`/verify-adherence`'s ratchet did not catch it. The LLM portion did.
+That means each future similar bug pays the LLM tax instead of getting
+cheap mechanical detection.
+
+## Actions
+
+Add to `skills/verify-adherence/SKILL.md` ratchet bank:
+
+1. `rng\.choice\([^)]*replace\s*=\s*True\)` followed within ±5 lines by
+   `set\(|unique\(|drop_duplicates\(`.
+   Flag: *"with-replacement sampling collapsed — drops multiplicities;
+   verify intent"*.
+2. `np\.random\.RandomState\(\)` (no seed argument).
+   Flag: *"unseeded RNG — not reproducible"*.
+3. A function named `*bootstrap*` whose body does NOT contain
+   `replace\s*=\s*True`.
+   Flag: *"function named `bootstrap` but does not appear to resample
+   with replacement"*.
+
+Each finding emits a suggested test
+(`@pytest.mark.skip("verify-adherence: ratchet scaffold")`) asserting
+the corrective invariant.
+
+## Test
+
+Run `verify-adherence` against pre-fix
+`scripts/compute_divergence_bootstrap.py:_run_citation_bootstrap` in
+Climate_finance commit before `20b1117`. Expect the with-replacement+set
+rule to fire.
+
+## Exit criteria
+
+- Three new rules in the ratchet bank with rule references.
+- Each rule includes a `suggested_test` template.
+- Documented in a test-style regression (on a fixture) so the rules
+  themselves are covered.
+- The old memo-1 "ticket A" is addressed.

@@ -1,0 +1,38 @@
+%erg v1
+Title: Wire /verify-adherence into Execute (pre-PR self-gate)
+Status: open
+Created: 2026-04-17
+Author: user
+
+--- log ---
+2026-04-17T10:00Z claude created from verify reflection memo (PR 691)
+
+--- body ---
+## Context
+
+Execute currently does Red → Green → Refactor → `make check` →
+`gh pr create`. The PR description claims completeness; a verify bounce
+afterward looks bad and adds latency. A pre-PR mechanical adherence
+check (no LLM rounds, just the ratchet) would let Execute self-gate
+cheaply.
+
+## Actions
+
+1. Update `skills/start-ticket/SKILL.md` (or its Execute sub-step) to
+   run `/verify-adherence` after `make check` and before `gh pr create`.
+2. If adherence finds blockers, Execute fixes them or stops with a
+   clear escalation; PR is not opened.
+3. Adherence-clean PRs get a `verify:adherence-passed` label so the
+   later `/verify` merge gate can skip the mechanical phase.
+
+## Test
+
+Drop a `np.random.RandomState()` (no seed) into a Phase 2 script and
+verify Execute refuses to open a PR.
+
+## Exit criteria
+
+- `/start-ticket` invokes `/verify-adherence` before `gh pr create`.
+- Blockers in pre-PR check halt PR creation.
+- `verify:adherence-passed` label propagates to the PR.
+- Memo-1 "ticket C" addressed.

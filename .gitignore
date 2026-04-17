@@ -19,6 +19,8 @@
 !commands/**
 !docs/
 !docs/**
+!tickets/
+!tickets/**
 
 # settings.json: universal config (hooks, effortLevel, universal permissions) — tracked
 # settings.local.json: machine-specific permissions — gitignored

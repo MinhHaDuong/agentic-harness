@@ -1,0 +1,44 @@
+%erg v1
+Title: /verify emits failing-test scaffolds for blockers
+Status: open
+Created: 2026-04-17
+Author: user
+
+--- log ---
+2026-04-17T10:00Z claude created from verify reflection memo (PR 691)
+
+--- body ---
+## Context
+
+The PR-691 verify report told the author to "add a sampling-semantics
+assertion so the blocker can't regress silently". The author had to
+reverse-engineer what that meant.
+
+A stub test in the diff converts review prose to executable expectations.
+Same pattern as `verify-adherence`'s `suggested_test` for semantic
+findings, but broader — applies to every blocker, not just adherence
+ones.
+
+## Actions
+
+1. Patch `skills/verify/SKILL.md`: on REROLL, the gate's
+   `unresolved_review_comments` and `unresolved_simplify_findings`
+   lists each get an attached test stub (best-effort, may be
+   `pytest.skip`'d).
+2. Stubs land via the fix agent on the PR branch with a
+   `verify: regression scaffold` marker so the human sees them in the
+   diff and can either implement or delete.
+3. Stubs include: imports, the assertion's correct shape, and a
+   pointer back to the verify comment that generated them.
+
+## Test
+
+Re-run on Climate_finance PR 691 pre-fix. Expect a stub like
+`test_citation_bootstrap_is_proper_subsampling` to be appended.
+
+## Exit criteria
+
+- REROLL blockers each yield a matching stub test on the PR branch.
+- Stubs are syntactically valid but allowed to `pytest.skip`.
+- Stubs carry a cross-ref comment pointing at the verify finding.
+- Memo-1 "ticket B" addressed.

@@ -1,0 +1,50 @@
+%erg v1
+Title: /verify — cheap static checks before deep review
+Status: open
+Created: 2026-04-17
+Author: user
+
+--- log ---
+2026-04-17T10:00Z claude created from verify reflection memo (PR 692)
+
+--- body ---
+## Context
+
+On PR 692, verify read source rather than running `make check-fast` or
+`python -c` first. The cheapest possible check — import resolution —
+should precede deep review. Formatter-strip-import bugs (the exact
+class the author's memory warned about) would be caught in seconds
+instead of minutes of LLM reasoning.
+
+The concrete incident: `C2STDivergenceSchema` import was stripped by
+the auto-formatter; all 17 local tests were green yet the first run
+would have `NameError`'d. Verify caught it but via LLM, not a cheap
+probe.
+
+## Actions
+
+1. At the start of `/verify-adherence`'s mechanical phase (before the
+   grep ratchet):
+   a. Parse the diff for every symbol referenced in touched modules.
+   b. For each `(module, name)` pair, run a one-line check:
+      ```
+      uv run python -c "import sys; sys.path.insert(0, 'scripts'); import M; getattr(M, 'name')"
+      ```
+   c. Fail with rule ref `verify-adherence#import-resolution` if any
+      symbol can't be resolved.
+2. Also run `uv run python -m pytest <touched-modules-test-files> -q`
+   to catch per-module test regressions before the full suite.
+3. Both checks are BLOCKING and fast (<10 s combined).
+
+## Test
+
+Introduce a formatter-style "import of a just-used symbol stripped"
+regression; verify-adherence should flag it at the cheap-check layer,
+not at the LLM layer.
+
+## Exit criteria
+
+- Import-resolution check runs before the grep ratchet.
+- Per-module test run precedes full-depth review.
+- Both are documented as the "phase 1.0" in verify-adherence.
+- Memo-2 "cheap checks before deep review" addressed.

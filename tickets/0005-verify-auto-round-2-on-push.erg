@@ -1,0 +1,53 @@
+%erg v1
+Title: /verify round 2 auto-triggers on fix-agent push
+Status: open
+Created: 2026-04-17
+Author: user
+
+--- log ---
+2026-04-17T10:00Z claude created from verify reflection memo (PR 691)
+
+--- body ---
+## Context
+
+`skills/verify/SKILL.md` documents round 2, but in practice the human
+has to re-invoke. For autonomous flows this defeats the anti-rubber-
+stamp guarantee — round 2 becomes "sometimes happens."
+
+## Actions
+
+1. After the fix agent pushes to the PR branch on REROLL, the verify
+   skill (still in scope of round 1) re-enters phase 6 directly
+   without needing a new invocation.
+2. Add a per-PR state file (`/tmp/verify-rounds/<pr>.txt` or the L1
+   file from ticket 0001) so push events trigger re-entry only when
+   the previous round was REROLL, not on every push during initial
+   author work.
+3. Hard cap at round 2 → ESCALATE (existing invariant).
+
+## Dependency
+
+Couples with ticket 0001 (concurrency guard). The L1 file format
+from 0001 is the natural place to store round state.
+
+## Open question
+
+Skills are invoked, they don't subscribe to push events. So "auto-
+trigger on push" has to happen INSIDE the still-running `/verify`
+invocation that spawned the fix agent — it polls for the agent's push
+and then re-enters. OK if the skill runtime is a long-running process;
+needs rework if skills are request/response.
+
+## Test
+
+Drive Climate_finance PR 691 through verify with the buggy bootstrap.
+Expect REROLL → fix agent push → automatic round 2 → APPROVED, all
+from a single `/verify 691` invocation.
+
+## Exit criteria
+
+- One `/verify <pr>` invocation triggers round 2 automatically after
+  fix agent push.
+- No human re-invocation needed for the bounce-back loop.
+- Round 2 → round 3 still forbidden.
+- Memo-1 "ticket D" addressed.
