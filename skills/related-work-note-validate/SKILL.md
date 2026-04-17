@@ -77,9 +77,10 @@ For each `(key, identifier, kind)`:
   failure. Record the entry key and the concrete reason
   (`404`, `timeout`, `DNS error`, etc.).
 
-Do not rate-limit aggressively — academic DOIs tolerate serial
-fetches — but do stop after three consecutive network errors and
-escalate: network failure is not a note failure.
+Serial fetches are acceptable. If a 429 (rate limit) response is
+received, back off for 5 seconds and retry once before counting
+the entry as failed. Stop after three consecutive network errors
+and escalate: network failure is not a note failure.
 
 ### 4. Parse the note's resolution claim
 
