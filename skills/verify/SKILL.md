@@ -142,8 +142,9 @@ telemetry: wall=<seconds>s agents=<n> tokens=<in+out> cost~=$<usd>
 
 ### Thresholds (configurable)
 
-Thresholds are read from `skills/verify/telemetry.yml`. Each is overridable
-per-run via the env var listed in that file. Defaults:
+Thresholds are read from `skills/verify/telemetry.yml` at phase-1 start.
+Env vars listed in the `env` block override the sibling numeric key when
+set and non-empty. Defaults:
 
 | Signal | Warn (continue) | Escalate (stop) |
 |--------|-----------------|-----------------|
@@ -152,7 +153,7 @@ per-run via the env var listed in that file. Defaults:
 
 Behaviour on breach:
 
-- **Warn** → post a short PR comment `verify: slow run` / `verify: token-heavy
+- **Warn** → post a short PR comment `/verify: slow run` / `/verify: token-heavy
   run` with the measured value, then continue the run. One warning per signal
   per run (no spam on re-entry for round 2).
 - **Escalate** → stop the run, post a `/verify stopped:` comment explaining
@@ -160,8 +161,9 @@ Behaviour on breach:
   the telemetry footer before exit so the human sees the numbers that caused
   the escalation.
 
-Check thresholds at phase boundaries, not inside phases — a mid-phase abort
-leaves the PR in an unclear state.
+Escalate takes precedence over warn: if both thresholds are breached at the
+same boundary, only escalate. Check thresholds at phase boundaries, not
+inside phases — a mid-phase abort leaves the PR in an unclear state.
 
 ## `--force-approve`
 
