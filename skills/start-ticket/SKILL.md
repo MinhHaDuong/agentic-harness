@@ -23,7 +23,13 @@ argument-hint: <ticket-id>
 6. Write the first test from the **Test** section of the ticket.
 7. Run `make check-fast` — confirm the test fails.
 8. Announce `[Plan → Execute]`, then implement until `make check` passes.
-9. Push the branch and open a merge request.
-10. Review according to `/review-pr`.
-11. Fix all comments regardless of severity.
-12. Repeat 10–11 up to 3 times. If still not clean, escalate (see workflow rules).
+9. Pre-PR self-gate: run `/verify-adherence <branch>` (the branch created in step 4).
+   - Clean → proceed to step 10 and pass `--label verify:adherence-passed` to `gh pr create`. The label signals to the downstream `/verify` merge gate that the mechanical adherence phase already ran clean and can be skipped on its next pass. (Create the label first with `gh label create verify:adherence-passed --force` if it does not yet exist.)
+   - Blockers → decide per blocker:
+     - Cheap and mechanical (obvious fix, no design judgement) → fix in place, re-run `make check` and `/verify-adherence`, then proceed only once clean. Up to 3 fix-and-recheck cycles; if still not clean after 3 rounds, escalate.
+     - Otherwise → STOP. Do not open the PR. Escalate with the adherence report and the blocker list.
+   - Circuit breaker: if `/verify-adherence` itself errors, times out, or returns an unparseable result → ESCALATE. Do not open the PR and do not silently skip the gate.
+10. Push the branch and open a merge request.
+11. Review according to `/review-pr`.
+12. Fix all comments regardless of severity.
+13. Repeat 11–12 up to 3 times. If still not clean, escalate (see workflow rules).
