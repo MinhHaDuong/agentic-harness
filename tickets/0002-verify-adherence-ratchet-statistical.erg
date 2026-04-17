@@ -8,6 +8,7 @@ Author: user
 2026-04-17T10:00Z claude created from verify reflection memo (PR 691)
 2026-04-17T17:45Z claude note mis-filed — domain-specific statistical rules (numpy / bootstrap / set) belong with the domain, not in the harness. Re-filed as Climate_finance ticket 0080 (tests/test_hygiene_sampling.py). Scope reduced to rule 1 only; rule 2 marginal, rule 3 dropped (naming heuristic, false-positive prone).
 2026-04-17T17:45Z claude status closed mis-filed; see Climate_finance ticket 0080
+2026-04-17T19:00Z claude note body's "externalize only when a second project needs it" note was superseded within the hour by PR #47, which replaced the hardcoded grep bank with a @pytest.mark.adherence marker contract — simpler than the bank, not a framework for a second beneficiary. CF 0082 captures the CF-side adoption. Provenance kept here so readers don't have to infer the reversal from git log.
 
 --- body ---
 ## Won't build here (mis-filed, 2026-04-17)
