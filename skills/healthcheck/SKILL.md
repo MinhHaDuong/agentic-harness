@@ -14,35 +14,22 @@ This skill is user-level and must **gracefully degrade**: each check runs only i
 
 ## Checks
 
-1. **Recent activity** — `git log --since="12 hours ago" --oneline --all` — summarize commit count and key themes
-2. **Open PRs** — `gh pr list --state open` — list or confirm zero. Skip with reason if `gh` unavailable or no remote.
-3. **Origin sync** — `git fetch origin` then compare `HEAD` vs `origin/<default-branch>` — report ahead/behind/synced. Skip if no `origin` remote.
-4. **Branch hygiene** — `git branch -a` — list all, flag stale feature branches
-5. **Worktrees** — `git worktree list` — list all, flag any orphaned worktrees beyond the current session
-6. **Orphan commits** — `git fsck --unreachable --no-reflogs 2>&1 | grep "^unreachable commit"` — report count or "none"
-7. **Working tree** — `git status --short` — report clean or list uncommitted changes
-8. **Tests green** — run the project's test suite and report pass/fail. Entry-point autodetect:
-   - If `Makefile` defines a `test` target → `make test`
-   - Else if `pyproject.toml` exists → `uv run pytest` (or `pytest` if `uv` unavailable)
-   - Else if `package.json` defines a `test` script → `npm test`
-   - Else → skip with reason `no test entry point detected`
-
-   Report: `N passed`, or `K failed / N total` plus the first failing test name. Slowest check; expect 10s–minutes.
-
-9. **Docs freshness (deep verification)** — run `scripts/docs_freshness.sh` (bundled with this skill) to get the mechanical report, then perform the manual cross-checks below. This check **must not be shallow** — existence alone is not enough. Scan every canonical status/directive doc that exists at the repo root: `STATE.md`, `MASTERPLAN.md`, `README.md`, `ROADMAP.md`, `ARCHITECTURE.md`, and any other top-level `*.md` whose filename is all-caps or clearly a status/directive doc. Skip docs that don't exist; don't invent them.
-
-   a. **Staleness timestamp.** `git log -1 --format=%ci -- <file>` — days since last commit touching the file. Warn if > 7 days have passed *and* the "Status"/"Last updated" line inside the doc predates the most recent repo activity. Fail if > 30 days with no update.
-
-   b. **Ticket cross-check** (conditional on `tickets/*.erg` presence — git-erg in use). Extract every `0\d{3}` or `ticket 0\d{3}` reference in the doc. Partition by context: "done" (inside `[x]` checkbox, "Closed" section, "merged" phrase) vs "todo" (inside `[ ]` checkbox, "Next actions", "Open tickets", "pending"). For each ticket ID, read `tickets/0NNN-*.erg` `Status:` header. Flag mismatches:
-      - Ticket listed as todo but `Status: closed` → stale TODO (most common drift)
-      - Ticket listed as done but `Status: open` → premature claim
-      - Referenced ticket ID not found in `tickets/` → broken ref
-
-      If `tickets/*.erg` is absent, skip this sub-check with reason `no git-erg tickets detected`. The helper script automates the most common drift; always run it when tickets exist.
-
-   c. **PR cross-check.** Extract every `#\d{3,}` reference. For each PR mentioned as pending / in-flight / open, verify via `gh pr view N --json state,title`. Flag merged PRs still described as pending work, and closed-without-merge PRs still described as landed. Skip if `gh` unavailable.
-
-   d. **Count consistency.** If the doc contains a count like "Open tickets (N)" or "N open", cross-check N against `grep -l "^Status: open" tickets/*.erg | wc -l` (add `pending` count if included). Flag drift. Skip if tickets absent or no count pattern found.
+1. **Recent activity** — commits in the last 12 hours, key themes
+2. **Open PRs** — list or confirm zero. Skip if `gh` unavailable.
+3. **Origin sync** — ahead/behind/synced. Skip if no remote.
+4. **Branch hygiene** — list all, flag stale feature branches
+5. **Worktrees** — list all, flag orphaned ones
+6. **Orphan commits** — count unreachable commits
+7. **Working tree** — clean or list uncommitted changes
+8. **Tests green** — autodetect test runner (make/pytest/npm), report pass/fail
+9. **Docs freshness (deep verification)** — run `scripts/docs_freshness.sh`,
+   then cross-check status/directive docs (`STATE.md`, `README.md`, etc.):
+   - **Staleness** — flag docs whose content predates recent repo activity
+   - **Ticket cross-check** — references to tickets whose status contradicts
+     the doc (todo but closed, done but open, broken ref). Skip if no `.erg` tickets.
+   - **PR cross-check** — PRs described as pending but already merged/closed.
+     Skip if `gh` unavailable.
+   - **Count consistency** — "N open tickets" claims vs actual count
 
 ## Output format
 
