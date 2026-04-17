@@ -1,0 +1,50 @@
+%erg v1
+Title: /celebrate prompts for bug-class regression tests
+Status: open
+Created: 2026-04-17
+Author: claude
+
+--- log ---
+2026-04-17T14:51Z claude created — supersedes 0003 after design discussion
+
+--- body ---
+## Context
+
+Supersedes 0003 (closed). 0003 proposed auto-generating test stubs
+from /verify blockers. Rejected because:
+
+- /verify is a per-PR gate — the wrong layer for test generalization.
+- Auto-generated stubs from review prose risk encoding the letter of
+  the comment, not the underlying invariant.
+- TDD already asks the author to write the test; stubs are a crutch
+  for authors skipping the red step.
+
+The TDD accumulation concern still stands: a bugfix that doesn't
+leave a standing test behind can regress silently in unrelated future
+PRs. /celebrate is the reflective layer — post-merge, with distance
+from the incident — and is the natural place to ask whether a bug
+reveals a class worth guarding.
+
+## Actions
+
+1. Patch `skills/celebrate/SKILL.md`: when the merged work includes
+   a bugfix, prompt the author "does this bug reveal a class worth a
+   standing test?"
+2. If yes, open a follow-up ticket for the regression test. The test
+   lands as its own reviewed change, not smuggled into the fix PR.
+3. Keep it a prompt, not an enforced step. Author judgment decides
+   whether the bug has a generalizable shape. No scaffolding, no
+   auto-written assertions.
+
+## Test
+
+Run /celebrate after a recent bugfix merge. Expect the reflection
+prompt to fire and, on acceptance, produce a new ticket referencing
+the fix PR.
+
+## Exit criteria
+
+- /celebrate surfaces the bug-class question on bugfix merges.
+- Accepting the prompt creates a follow-up ticket (not an auto test).
+- Declining is silent — no nagging, no markers on the PR.
+- 0003 referenced in this ticket's context as superseded.

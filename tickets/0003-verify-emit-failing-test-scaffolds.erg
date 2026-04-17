@@ -1,11 +1,12 @@
 %erg v1
 Title: /verify emits failing-test scaffolds for blockers
-Status: open
+Status: closed
 Created: 2026-04-17
 Author: user
 
 --- log ---
 2026-04-17T10:00Z claude created from verify reflection memo (PR 691)
+2026-04-17T14:51Z claude status closed — wrong layer; /verify is a per-PR gate, not a place to design bug-class tests. Superseded by 0014 (generalization moved to /celebrate).
 
 --- body ---
 ## Context
