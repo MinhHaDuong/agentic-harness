@@ -1,11 +1,14 @@
 %erg v1
 Title: Wire /verify-adherence into Execute (pre-PR self-gate)
-Status: open
+Status: closed
 Created: 2026-04-17
 Author: user
 
 --- log ---
 2026-04-17T10:00Z claude created from verify reflection memo (PR 691)
+2026-04-17T12:41Z claude claimed
+2026-04-17T12:41Z claude note added pre-PR /verify-adherence self-gate to start-ticket Execute phase; clean runs tag PR with verify:adherence-passed, blockers halt PR creation, circuit-breaker escalates on adherence tool failure
+2026-04-17T12:41Z claude status closed exit criteria met
 
 --- body ---
 ## Context
