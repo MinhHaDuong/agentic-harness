@@ -1,11 +1,14 @@
 %erg v1
 Title: /verify minors — verifiable / consider / nofollow language discipline
-Status: open
+Status: closed
 Created: 2026-04-17
 Author: user
 
 --- log ---
 2026-04-17T10:00Z claude created from verify reflection memo (PR 691)
+2026-04-17T12:26Z claude claimed
+2026-04-17T12:26Z claude note added verifiable/consider/nofollow minor-tagging discipline to review-pr and review-pr-prose; verify-gate enforces tags, treats verifiable as blocker-adjacent, consider as informational, nofollow as muted, and refuses hedged X-might-break language
+2026-04-17T12:26Z claude status closed exit criteria met
 
 --- body ---
 ## Context

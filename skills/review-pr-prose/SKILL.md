@@ -37,6 +37,20 @@ One agent is always the **AI-tells auditor**. It reads `config/ai-tells.yml` for
 4. Build the manuscript. Check consistency between prose and data.
 5. Post a single review on the merge request.
 
+## Minor/suggestion tags (mandatory)
+
+Every minor or suggestion item in the posted review carries exactly one prefix:
+
+| Prefix | Meaning |
+|---|---|
+| `verifiable:` | A reproducible check is attached (line-number citation against the text, numeric recheck, lint rule violation). Reviewer can confirm without re-reading the paragraph. |
+| `consider:` | Hypothesis or taste call. No enforcement. Author may dismiss. |
+| `nofollow:` | Noted but not pursued (out of venue, already handled elsewhere, deliberate stylistic choice). No action expected. |
+
+Rules:
+- Hedged prose like "readers may find X confusing" without a concrete pointer is forbidden. Either cite the line and the confusable construction (`verifiable:`) or downgrade to `consider:`.
+- Majors are not tagged; tags are for the minor/suggestion tier only.
+
 ## Proportional depth
 
 | Text change | Panel size |

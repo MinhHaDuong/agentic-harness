@@ -32,6 +32,11 @@ standalone-callable for debugging.
    is a REROLL trigger.
 6. **Two rounds max.** Round 1 is initial gate. Round 2 is post-fix re-gate. Round 3 is
    forbidden — escalate.
+7. **Tagged minors are mandatory.** Review comments from `/review-pr` and
+   `/review-pr-prose` at the minor/suggestion tier must carry one of `verifiable:`,
+   `consider:`, or `nofollow:`. Untagged minors and ambiguous "X might break" /
+   "this could cause Y" phrasings are refused — the gate does not triage hedges. See
+   "Minor tag handling" below.
 
 ## Input
 
@@ -77,8 +82,15 @@ per_exit_criterion:
 unresolved_review_comments:
   - comment_ref: <url or id>
     author: <login>
+    tag: verifiable | consider | nofollow | untagged
     thread_excerpt: "<short>"
     why_unresolved: "<reason>"
+
+malformed_minors:
+  - comment_ref: <url or id>
+    author: <login>
+    excerpt: "<hedged phrasing>"
+    fix: "retag as verifiable: with assertion, or as consider:"
 
 unresolved_simplify_findings:
   - finding: "<verbatim>"
@@ -106,12 +118,41 @@ second_round_needed:
 - Any `UNRESOLVED` review comment from a human author → REROLL (round 1) / ESCALATE (round 2).
 - Any `UNRESOLVED` review comment from `/review-pr` labelled severity ≥ medium →
   REROLL (round 1) / ESCALATE (round 2).
+- Any unresolved `verifiable:` minor (failing assertion still reproduces) → treated as
+  blocker-adjacent: REROLL (round 1) / ESCALATE (round 2).
+- `consider:` minors are informational. They appear in the verdict comment but do not
+  bounce the PR. Author is free to ignore.
+- `nofollow:` minors are muted. The gate records them for the audit trail and does
+  nothing else.
 - Any `NOT_APPLIED` must-fix simplify finding without rationale → REROLL (round 1) /
   ESCALATE (round 2).
 - Any `blocking` adherence violation → REROLL (round 1) / ESCALATE (round 2).
 - All lists empty AND all criteria ADDRESSED → APPROVED.
 
 If `round == 2` and any trigger fires → upgrade to ESCALATE. Never a third round.
+
+## Minor tag handling
+
+Incoming `/review-pr` and `/review-pr-prose` comments at the minor/suggestion tier are
+expected to be prefixed `verifiable:`, `consider:`, or `nofollow:`.
+
+| Tag | Gate treatment |
+|---|---|
+| `verifiable:` | Blocker-adjacent. Must be ADDRESSED (commit closes the assertion, or a follow-up ticket is opened with rationale). Unresolved → REROLL. |
+| `consider:` | Informational. Surfaced in the verdict comment under a `consider:` section. Never bounces. |
+| `nofollow:` | Muted. Not surfaced, not counted. |
+
+Untagged or ambiguously-phrased minors ("might break", "could regress", "may confuse
+readers" without a line pointer) are a process failure, not a finding. The gate:
+
+1. Lists them under `malformed_minors` in the verdict bundle.
+2. Does not let them bounce the PR on their own.
+3. Flags the review author for retag — either promote to `verifiable:` with a failing
+   test, or downgrade to `consider:`.
+
+The gate itself also refuses to author hedged language in its own rationale. If the
+gate wants to raise a concern, it either attaches a reproducible check (making it a
+blocker or a `verifiable:` minor) or files it as `consider:`.
 
 ## Anti-patterns the gate refuses to indulge
 
@@ -122,6 +163,7 @@ If `round == 2` and any trigger fires → upgrade to ESCALATE. Never a third rou
 | "Reviewer concern filed as follow-up" with no ticket ID | Unverifiable; ticket must exist |
 | "Addressed in PR body" without commit | PR body is narrative; need the actual change |
 | "Edge case out of scope" without Scope audit confirmation | The Scope phase is Phase 7; gate cannot waive unilaterally |
+| "X might break" / "could cause Y" as a minor | Ambiguous middle ground. Require `verifiable:` with a failing assertion, or `consider:` as explicit hypothesis. |
 
 ## Standalone invocation
 
@@ -146,11 +188,20 @@ apply only when called from `/verify`.
    Simplify: <n_unresolved> must-fix not applied
    Adherence: <n_blocking> blocking violations
 
+   Minors:
+   - verifiable: <count> (<n_unresolved> unresolved, blocker-adjacent)
+   - consider:   <count> (informational, does not bounce)
+   - nofollow:   <count> (muted)
+   - malformed:  <count> (retag required)
+
    Top reasons (if not APPROVED):
    - <ranked list>
 
    Rationale: <paragraph>
    ```
+
+   The three prefixes (`verifiable:`, `consider:`, `nofollow:`) appear verbatim in the
+   posted comment so authors can see which class each minor falls into.
 
 ## Circuit breakers
 

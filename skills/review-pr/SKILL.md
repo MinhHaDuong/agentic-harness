@@ -52,6 +52,21 @@ Spin multiple agents in parallel, each with a distinct perspective. Run all agen
 4. **Run tests**: `make check`
 5. **Post a single review** on the merge request, attributing each finding to its perspective.
 
+## Minor finding tags (mandatory)
+
+Every non-blocker finding posted in the review carries exactly one prefix:
+
+| Prefix | Meaning |
+|---|---|
+| `verifiable:` | A current failing assertion is attached (test_id, command output, or commit SHA:file:line). The claim is reproducible now. |
+| `consider:` | Hypothesis worth flagging, no enforcement. No test exists and none is required. Author may dismiss. |
+| `nofollow:` | Intentionally not pursued (out of scope, duplicate, stylistic preference). Recorded for the audit trail; no action expected. |
+
+Rules:
+- Ambiguous "this might break X" / "could cause Y" language is forbidden. Either produce the failing assertion (`verifiable:`) or downgrade to `consider:`.
+- A `verifiable:` finding without attached evidence is a posting bug — hold the review until the evidence exists or retag.
+- Blockers (`request-changes`) are not tagged; tags are for the minor/comment tier only.
+
 ## Code-quality escalation
 
 | Severity | Action |
