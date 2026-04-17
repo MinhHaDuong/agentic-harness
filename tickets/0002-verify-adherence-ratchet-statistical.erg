@@ -1,14 +1,48 @@
 %erg v1
-Title: verify-adherence ratchet for statistical antipatterns
-Status: open
+Title: Mis-filed — statistical antipattern rules belong in Climate_finance
+Status: closed
 Created: 2026-04-17
 Author: user
 
 --- log ---
 2026-04-17T10:00Z claude created from verify reflection memo (PR 691)
+2026-04-17T17:45Z claude note mis-filed — domain-specific statistical rules (numpy / bootstrap / set) belong with the domain, not in the harness. Re-filed as Climate_finance ticket 0080 (tests/test_hygiene_sampling.py). Scope reduced to rule 1 only; rule 2 marginal, rule 3 dropped (naming heuristic, false-positive prone).
+2026-04-17T17:45Z claude status closed mis-filed; see Climate_finance ticket 0080
 
 --- body ---
-## Context
+## Won't build here (mis-filed, 2026-04-17)
+
+Domain-specific rules don't belong in the harness. Re-filed as
+Climate_finance ticket 0080, scoped to a single hygiene test in that
+repo (`tests/test_hygiene_sampling.py`), which `/verify-adherence` phase
+1 picks up automatically via the `test_hygiene_*` filename convention.
+
+**Architectural note.** The harness's Phase 2 grep bank in
+`skills/verify-adherence/SKILL.md` is currently hardcoded and contains
+Climate_finance-specific patterns (`refined_works|refined_embeddings|
+refined_citations`, `data/catalogs/`, etc.). That is architectural debt.
+Externalizing it to a project-local ratchet format is speculative
+framework-building until a *second* project needs project-local rules —
+AEDIST, CIRED.digital, or activity reports might eventually qualify,
+but none do today. When a second project needs it, that ticket writes
+itself. Until then, Climate_finance owns its rules via its own hygiene
+test files.
+
+**Scope reductions applied in the re-file:**
+- Rule 1 (`replace=True` + dedup) → kept, this is the star rule.
+- Rule 2 (unseeded `RandomState()`) → dropped for now. Partial overlap
+  with existing seed rule in harness bank; marginal signal, not worth
+  the noise on first pass.
+- Rule 3 (`bootstrap` name + no `replace=True`) → dropped. Naming-
+  convention heuristic, false-positives on unrelated `bootstrap_*`
+  helpers. Erodes trust in the check.
+
+The rest of this body preserves the original multi-rule proposal for
+historical reference. Do not read it as a plan.
+
+---
+
+## Context (original)
 
 The ticket-0069 blocker (Climate_finance PR 691) was a textbook
 "with-replacement sample collapsed by `set()`" bug:
