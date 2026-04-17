@@ -322,27 +322,38 @@ ensures the note remains readable without requiring the reader to
 know the source language.
 
 ```bibtex
-@article{AuthorYEAR,
-  author = {Author, A. and Author, B.},
-  title  = {{Full title}},
-  year   = {YEAR},
-  journal = {Venue},
-  doi    = {10.xxxx/yyyy},
-  url    = {https://stable-url/},
+@article{Author-NameYEAR:slug,
+  author       = {Author, A. and Author, B.},
+  title        = {{Full title}},
+  journaltitle = {Venue},
+  date         = {YYYY-MM},
+  number       = {42},
+  pages        = {100--115},
+  doi          = {10.xxxx/yyyy},
+  eprint       = {https://hal.science/hal-XXXXXXXX},
 }
 
 % Non-English example:
-@article{MüllerYEAR,
-  author  = {Müller, K.},
-  title   = {{Ursprünglicher Titel [Original title in English]}},
-  year    = {YEAR},
-  journal = {Venue},
-  doi     = {10.xxxx/yyyy},
-  url     = {https://stable-url/},
+@inproceedings{Müller2023:klimaschutz,
+  author       = {Müller, K.},
+  title        = {Ursprünglicher Titel [{Original} title in {English}]},
+  booktitle    = {Conference Name},
+  date         = {2023-07-07},
+  location     = {City},
+  doi          = {10.xxxx/yyyy},
+  eprint       = {https://hal.science/hal-XXXXXXXX},
 }
 
 % ... more entries ...
 ```
+
+Style notes (aligned with `~/CNRS/html/src/Ha-Duong.bib`):
+- Keys: `Author-NameYEAR:slug` (hyphenated surname, colon-separated slug).
+- Use biblatex fields: `date` (not `year`), `journaltitle` (not `journal`),
+  `location` (not `address`).
+- Use `eprint` for HAL/arXiv links alongside `doi`.
+- Field values aligned with padding (max-width column for field names).
+- Omit `url` when `doi` is present (the DOI is the stable link).
 ```
 
 ## Notes on style
