@@ -93,7 +93,8 @@ Run web and scholar searches to surface:
   (pre-2015). Example: Lewis et al. 2020 for RAG; BERT 2019 for
   transformer-era IE.
 - **Review / survey papers** — to let the author drill down later.
-  Prefer recent surveys (≤3 years old) with strong citation counts.
+  Prefer recent surveys with strong citation counts; note the field's
+  pace when assessing currency.
 - **Recent frontier works** — 2024–2026 results. Preprints allowed
   when no peer-reviewed equivalent exists; flag them as such.
 - **Superseded or widely-critiqued works** — so "related but not
@@ -316,19 +317,46 @@ arXiv-only entries, older conference papers, and grey literature may
 have only a URL. Entries flagged `[preprint]` in the key comment
 when they are not yet peer-reviewed.
 
+Non-English titles must include a bracketed English translation in
+the `title` field: `{Original title [Translated title]}`. This
+ensures the note remains readable without requiring the reader to
+know the source language.
+
 ```bibtex
-@article{AuthorYEAR,
-  author = {Author, A. and Author, B.},
-  title  = {{Full title}},
-  year   = {YEAR},
-  journal = {Venue},
-  doi    = {10.xxxx/yyyy},
-  url    = {https://stable-url/},
+@article{Author-NameYEAR:slug,
+  author       = {Author, A. and Author, B.},
+  title        = {{Full title}},
+  journaltitle = {Venue},
+  date         = {YYYY-MM},
+  number       = {42},
+  pages        = {100--115},
+  doi          = {10.xxxx/yyyy},
+  eprint       = {hal-XXXXXXXX},
+  eprinttype   = {hal},
+}
+
+% Non-English example:
+@inproceedings{Muller2023:klimaschutz,
+  author       = {Müller, K.},
+  title        = {Ursprünglicher Titel [{Original} title in {English}]},
+  booktitle    = {Conference Name},
+  date         = {2023-07-07},
+  location     = {City},
+  doi          = {10.xxxx/yyyy},
+  eprint       = {hal-XXXXXXXX},
+  eprinttype   = {hal},
 }
 
 % ... more entries ...
 ```
-```
+
+Style notes (aligned with `~/CNRS/html/src/Ha-Duong.bib`):
+- Keys: `Author-NameYEAR:slug` (hyphenated surname, colon-separated slug).
+- Use biblatex fields: `date` (not `year`), `journaltitle` (not `journal`),
+  `location` (not `address`).
+- Use `eprint` for HAL/arXiv links alongside `doi`.
+- Field values aligned with padding (max-width column for field names).
+- Omit `url` when `doi` resolves to open-access full text. Keep both when the DOI gates a paywall and `url` points to an open copy.
 
 ## Notes on style
 
@@ -344,6 +372,18 @@ when they are not yet peer-reviewed.
 - Keep the note self-contained: a reader should not need access to
   anything else in the repo to judge the cited works.
 
+## Toolchain
+
+The project uses **biblatex** (not BibTeX) compiled with **biber**.
+Local `.bib` files in the repo are staging areas, not the canonical
+library. The canonical library is **Zotero** (currently v9+).
+
+At manuscript submission, approved entries must be imported into
+Zotero (File → Import the `.bib`, then attach fulltext PDFs). This
+is the author's responsibility — the skill does not automate it.
+The `/bib-merge` skill handles the intermediate step (note →
+local `.bib`); Zotero import is the final step.
+
 ## Failure modes to avoid
 
 - Drafting a note with fewer than two "Related but not cited"
@@ -354,5 +394,5 @@ when they are not yet peer-reviewed.
   the reference under a different key. Always check first.
 - Omitting the preprint-acceptability note or the freshness cutoff
   from Methods.
-- Padding the bibliography. 15 well-justified citations beats 30
-  noisy ones; fewer is fine if the paragraph's claim is narrow.
+- Padding the bibliography. Every entry must be directly justified;
+  do not add references for coverage.
