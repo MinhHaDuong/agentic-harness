@@ -58,13 +58,15 @@ entry, collect:
 
 - the entry key (e.g., `AuthorYEAR`),
 - the `doi = {...}` value, if present,
-- the `url = {...}` value, if present.
+- the `url = {...}` value, if present,
+- the `eprint = {...}` value, if present (HAL or arXiv identifier).
 
 Build a list of `(key, identifier, kind)` tuples where `kind` is
-`doi` or `url`. For entries with both a DOI and a URL, prefer the
+`doi`, `url`, or `eprint`. For entries with both a DOI and a URL, prefer the
 DOI (resolve `https://doi.org/{DOI}`); the URL is a backup only if
-the DOI check fails. Entries with neither a DOI nor a URL are
-classified as `unverifiable` — they cannot be resolved by this
+the DOI check fails. An `eprint` value (HAL or arXiv URL/identifier)
+is resolved the same way as a `url` entry. Entries with neither a DOI,
+URL, nor eprint are classified as `unverifiable` — they cannot be resolved by this
 validator and are flagged in the report (see step 4).
 
 ### 3. Resolve every identifier
@@ -89,7 +91,7 @@ Classify every Bibliography entry into one of three buckets:
 
 - **resolved** — fetched OK (2xx or 30x→2xx).
 - **failed** — fetch returned non-2xx, DNS error, or timeout.
-- **unverifiable** — entry has no DOI and no URL.
+- **unverifiable** — entry has no DOI, URL, or eprint.
 
 Verdict logic:
 
@@ -132,7 +134,7 @@ the next section) to append. Never overwrite the file with `Write`.
 Print exactly one of:
 
 - `PASS`
-- `WARN: {U} entries have no DOI/URL`
+- `WARN: {U} of {N} entries have no DOI/URL`
 - `FAIL: {K} entries unresolved, {U} unverifiable`
 
 followed by the path of the note file that was annotated. Nothing

@@ -82,7 +82,7 @@ the loop. Specify + enforce.
 
 - [ ] Clean pilot note → `PASS`.
 - [ ] Note with broken DOI → `FAIL` naming the entry.
-- [ ] Note missing the resolution line → `MISSING`.
+- [ ] Entry with no DOI/URL → `WARN` listing the unverifiable key.
 - [ ] Validator never edits cited-work content — only appends to
       Methods.
 
