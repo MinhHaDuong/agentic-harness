@@ -1,11 +1,12 @@
 %erg v1
 Title: /verify round 2 auto-triggers on fix-agent push
-Status: open
+Status: closed
 Created: 2026-04-17
 Author: user
 
 --- log ---
 2026-04-17T10:00Z claude created from verify reflection memo (PR 691)
+2026-04-17T16:00Z claude status closed — SKILL.md already specifies this at line 79: "On push, re-enter phase 6 with round=2." No code/spec change needed; the ticket described existing behavior.
 
 --- body ---
 ## Context
