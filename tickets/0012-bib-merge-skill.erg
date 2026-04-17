@@ -1,11 +1,14 @@
 %erg v1
 Title: Build skill — bib-merge (merge related-work-note bibliography block into refs.bib)
-Status: open
+Status: closed
 Created: 2026-04-17
 Author: claude
 
 --- log ---
 2026-04-17T09:50Z claude created — migrated from ImperialDragonHarness#33 after realising IDH uses local .erg tickets for intra-project coordination (FORMAT.md). GH issue closed with pointer here.
+2026-04-17T12:45Z claude claimed
+2026-04-17T12:45Z claude note drafted skills/bib-merge/SKILL.md
+2026-04-17T12:45Z claude status closed exit criteria met
 
 --- body ---
 ## Context
