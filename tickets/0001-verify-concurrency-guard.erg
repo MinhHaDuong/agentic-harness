@@ -1,15 +1,96 @@
 %erg v1
-Title: /verify three-layer concurrency guard (file + label + counter)
-Status: open
+Title: /verify concurrency guard — won't build (speculative; cost exceeds benefit)
+Status: closed
 Created: 2026-04-17
 Author: user
 
 --- log ---
 2026-04-17T10:00Z claude created
 2026-04-17T10:00Z claude note migrated from Climate_finance ticket 0079 (misfiled) and IDH issue #34
+2026-04-17T17:00Z claude note orchestrator-001 reimagine rescoped to L1 only; L2/L3 deferred as speculative for single-user harness
+2026-04-17T17:15Z claude claimed
+2026-04-17T17:20Z claude note implemented L1 file lock in skills/verify/SKILL.md; opened PR #44
+2026-04-17T17:25Z claude note /verify 44 returned approve-with-polish (session_id undefined, O_EXCL not specified, stale body sections); on reflection the real issue was deeper
+2026-04-17T17:30Z claude note PR #44 closed, branch deleted, skill changes reverted. See "Won't build (post-mortem)" section in body. Original three-layer design kept below as historical reference.
+2026-04-17T17:30Z claude status closed won't build — problem shape didn't materialize, proposed fix had worse expected cost
 
 --- body ---
-## Context
+## Won't build (post-mortem, 2026-04-17)
+
+Built, reviewed, reverted. Keeping the ticket as a record because the
+reasoning is the point.
+
+**The arc:**
+1. Original ticket proposed a three-layer concurrency guard (file lock +
+   GitHub label + monotonic counter) to prevent parallel `/verify` runs
+   from colliding.
+2. A reimagine scoped it to L1 only (file lock), arguing L2/L3 were
+   speculative for a single-user harness.
+3. L1 was implemented on a branch, opened as PR #44, reviewed clean with
+   minor polish suggestions.
+4. Second look before merge: L1 itself was a bad idea for the same reason
+   L2/L3 were. Reverted.
+
+**What the ticket-wip pattern got wrong when copied over:**
+
+`.git/ticket-wip/<ID>.wip` works because ticket work lives for hours to
+days. A stale `.wip` is low-friction to notice and clear. `/verify` is a
+~5-minute operation. A 30-minute stale-lock TTL outlives the operation it
+protects by 6×.
+
+Expected frequency of each outcome per month of normal use:
+
+| Outcome | Rate | Cost |
+|---------|------|------|
+| Intentional double-run prevented | 0–1 | Had it happened: doubled PR comments, minutes of triage |
+| Stale lock from crashed / Ctrl-C'd / hook-blocked run | 3–10 | 30-min wait or manual `rm` on a path the user doesn't remember |
+
+The thing being prevented was rarer than the breakage the guard
+introduced, and the recovery cost for the breakage was worse than the
+recovery cost for the thing it prevented.
+
+**What's already there that covered the concern:**
+
+`/verify-gate` scans PR comments for `round=` markers. If two `/verify`
+runs ever really collided, the second gate verdict would see the first's
+round=1 comment and either reconcile or escalate. The doubling risk was
+at the *comment* layer, not the *correctness* layer — and doubled
+comments are cheap to clean up.
+
+**Lessons kept for future speculative-architecture reviews:**
+
+1. **Stale-lock TTL must fit the protected operation's lifetime.** Copying
+   a coordination pattern across lifetime scales (day-grain → minute-grain)
+   without adjusting TTL is a smell. The 30-min threshold borrowed from
+   ticket claims made the guard worse than useless for a 5-min operation.
+2. **Count the failure modes you introduce, not just the ones you prevent.**
+   The reimagine audited "is this overengineered?" but not "does this add
+   more operational friction than it removes?" Rare-prevention vs.
+   routine-breakage is an asymmetry that's easy to miss when you're
+   thinking in terms of "is the design minimal?" instead of "what's the
+   expected-cost delta?"
+3. **Check what's already there.** `/verify-gate`'s existing round-counter
+   scan of PR comments was a working partial L3. Knowing that before
+   planning would have changed the scope from "build a guard" to "trust
+   the existing guard; add nothing."
+4. **Build-then-revert is cheaper than build-then-regret.** PR #44 existed
+   for ~20 minutes, was reviewed, and got closed with ceremony. That's
+   fine. Not every ticket should ship.
+
+**Not building, don't reopen unless:**
+
+- A real collision happens in practice (not a hypothetical).
+- `/verify-gate`'s round-counter scan proves insufficient in that concrete
+  case.
+- The specific failure mode is documented with data, not argued from
+  threat-model diagrams.
+
+The rest of this body preserves the original three-layer design for
+historical reference. Do not read it as a plan.
+
+---
+
+## Context (original)
 
 `/verify` has no concurrency control. Two parallel `/verify <same-pr>`
 invocations across chats or machines would double-comment, race on
