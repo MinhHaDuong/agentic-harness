@@ -1,56 +1,40 @@
 %erg v1
-Title: /verify surfaces CI absence + pre-existing main failures + audits body claims
+Title: /verify surfaces CI absence
 Status: open
 Created: 2026-04-17
 Author: user
 
 --- log ---
 2026-04-17T10:00Z claude created from two reflection memos (PR 691 + PR 692)
+2026-04-17T15:16Z claude note scope narrowed — pre-existing-failure separation carved out to climate-finance 0079 (project-specific: needs its test runner + a cached failure set). Body-claim audit dropped (conventions handle it cheaper than tooling).
 
 --- body ---
 ## Context
 
-Two related gaps, both surfaced on first use:
+PR 691 had `no checks reported`. /verify said nothing about it —
+treating the PR body as narrative rather than running its own minimal
+pre-gate checks.
 
-1. PR 691 had `no checks reported` and pre-existing `test_golden_values`
-   failures from ticket 0067. Verify said nothing about either.
-2. PR 692's author wrote "check-fast clean" and "G9 failure
-   pre-existing" in the body. Neither claim was cross-checked by verify.
-
-Both mean the verify skill treats the PR body as narrative rather than
-a self-validating report.
+The two other gaps from the original memos (pre-existing-failure
+separation, body-claim audit) were removed from this ticket: the first
+is per-project and moved to climate-finance 0079; the second was
+dropped as the fragility of prose pattern-matching outweighs the
+benefit over a convention.
 
 ## Actions
 
 1. Setup phase of `/verify`: query `gh pr checks <pr>`. If empty, post
-   a `verify: CI gap` informational comment (not a bounce — just visible).
-2. Setup also runs
-   `git checkout <merge-base> && uv run pytest tests/ -q --tb=no` in the
-   isolated worktree to capture the pre-existing failure set, diffs
-   against the PR-branch failure set. Report *introduced* and
-   *pre-existing* separately.
-3. Pre-existing failures are reported, never bounce the PR.
-4. Body-claim audit: if the PR body contains patterns like
-   `*passes*`, `*clean*`, `*pre-existing*`, the gate extracts the
-   subject and cross-checks:
-   - "tests pass" → run them
-   - "failure X pre-existing" → check if X appears in the merge-base
-     failure set
-   - "no regression" → diff the failure sets
-5. Audited claims are annotated in the verify comment:
-   ✓ verified / ✗ contradicted / ? could not be verified.
+   a `verify: CI gap` informational comment. Not a bounce — just
+   visible. Treat "pending" as not-yet-empty (no comment).
 
 ## Test
 
-1. Run on a PR over a branch with known pre-existing failures; expect
-   them listed under "pre-existing on main, not introduced".
-2. Open a PR with body `"tests pass; failure X pre-existing"` where X
-   does not appear on main; verify should annotate X as ✗ contradicted.
+On a PR whose repo has no CI configured, expect a single
+`verify: CI gap` comment on the gate's first pass. On a PR with CI
+still pending, expect no such comment.
 
 ## Exit criteria
 
 - CI absence produces a visible `verify: CI gap` note.
-- Pre-existing failures are surfaced separately from introduced ones.
-- Body claims about pass/clean/pre-existing are audited and annotated.
-- Memo-1 "ticket E" and memo-2 "audit PR-body evidence claims" both
-  addressed.
+- No false positive when checks are merely pending.
+- Memo-1 "ticket E (CI gap)" addressed.
