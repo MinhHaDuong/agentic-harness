@@ -99,6 +99,63 @@ Push commits to the PR branch; do not open new PRs. Trigger re-entry into phase 
 - Fix agent timeout (10 min) → ESCALATE.
 - Gate disagrees with phase 2–5 on a must-fix finding → ESCALATE (no silent resolution).
 - Two REROLL rounds reached → ESCALATE.
+- Telemetry thresholds (see `## Telemetry`).
+
+## Telemetry
+
+A `/verify` run with no progress signal is indistinguishable from a runaway.
+Every run emits runtime + cost so the reader can calibrate.
+
+### Per-phase timing (stderr only)
+
+Before and after each phase (1 setup, 2–4 review fan-out, 5 simplify, 6 gate,
+fix-agent rounds), print one line to stderr:
+
+```
+[verify] phase=<name> start=<ISO-8601>
+[verify] phase=<name> end=<ISO-8601> elapsed=<seconds>s
+```
+
+Stderr only — never posted to the PR. Intended for log capture, not review.
+
+### Verdict footer (PR comment)
+
+Append exactly one line to the verdict comment (APPROVED / REROLL / ESCALATE):
+
+```
+telemetry: wall=<seconds>s agents=<n> tokens=<in+out> cost≈$<usd>
+```
+
+- `wall` — seconds from phase-1 start to verdict post.
+- `agents` — count of sub-agent invocations (review, review-pr, simplify,
+  verify-adherence, fix agent, gate).
+- `tokens` — sum of input + output across all sub-agents and the driver,
+  as reported by the SDK/agent results.
+- `cost≈` — best-effort USD estimate using current model rates; prefix with
+  `≈` since it's an approximation, not a billed figure.
+
+### Thresholds (configurable)
+
+Thresholds are read from `skills/verify/telemetry.yml`. Each is overridable
+per-run via the env var listed in that file. Defaults:
+
+| Signal | Warn (continue) | Escalate (stop) |
+|--------|-----------------|-----------------|
+| Wall   | 15 min          | 30 min          |
+| Tokens | 500k            | 1M              |
+
+Behaviour on breach:
+
+- **Warn** → post a short PR comment `verify: slow run` / `verify: token-heavy
+  run` with the measured value, then continue the run. One warning per signal
+  per run (no spam on re-entry for round 2).
+- **Escalate** → stop the run, post a `/verify stopped:` comment explaining
+  which threshold tripped and the measured value, skip remaining phases. Add
+  the telemetry footer before exit so the human sees the numbers that caused
+  the escalation.
+
+Check thresholds at phase boundaries, not inside phases — a mid-phase abort
+leaves the PR in an unclear state.
 
 ## `--force-approve`
 
@@ -134,4 +191,6 @@ Adherence: PASS | FAIL (<count>)
 
 Rationale:
 <paragraph>
+
+telemetry: wall=<seconds>s agents=<n> tokens=<in+out> cost≈$<usd>
 ```

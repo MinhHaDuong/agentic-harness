@@ -1,0 +1,19 @@
+#  /verify telemetry thresholds
+#
+# Keep these as knobs, not code. Operators can widen/narrow without
+# touching SKILL.md. Overridable per-invocation via env vars listed
+# in the "env" key (takes precedence over the values below).
+
+wall_seconds:
+  warn: 900      # 15 min → post "verify: slow run" comment, continue
+  escalate: 1800 # 30 min → ESCALATE (likely runaway)
+
+tokens:
+  warn: 500000    # 500k in+out → post "verify: token-heavy run" comment, continue
+  escalate: 1000000  # 1M → ESCALATE
+
+env:
+  wall_seconds_warn:      VERIFY_WALL_WARN_S
+  wall_seconds_escalate:  VERIFY_WALL_ESCALATE_S
+  tokens_warn:            VERIFY_TOKENS_WARN
+  tokens_escalate:        VERIFY_TOKENS_ESCALATE

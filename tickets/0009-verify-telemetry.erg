@@ -1,11 +1,14 @@
 %erg v1
 Title: /verify emits runtime + cost telemetry
-Status: open
+Status: closed
 Created: 2026-04-17
 Author: user
 
 --- log ---
 2026-04-17T10:00Z claude created from verify reflection memo (PR 692)
+2026-04-17T12:00Z claude claimed
+2026-04-17T12:05Z claude note added Telemetry section to skills/verify/SKILL.md; thresholds in skills/verify/telemetry.yml (env-overridable)
+2026-04-17T12:10Z claude status closed exit criteria met
 
 --- body ---
 ## Context
