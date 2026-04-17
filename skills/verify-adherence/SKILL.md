@@ -31,6 +31,36 @@ One argument: a branch name or PR number. Resolve PR → branch via `gh pr view 
 
 ## Phases
 
+### 1.0 Cheap static checks (always first, budget <10 s)
+
+Runs before anything else in the mechanical phase. Two sub-checks, both **blocking**;
+failure stops the phase here and does not fall through to 1/2/3. Combined budget <10 s.
+
+**(a) Import resolution.** Parse the diff for every symbol referenced in touched modules
+under `scripts/`. For each `(module, name)` pair:
+
+```bash
+uv run python -c "import sys; sys.path.insert(0, 'scripts'); import M; getattr(M, 'name')"
+```
+
+Catches the formatter-strip-import class of bug: tests are green, but the first real run
+`NameError`s because an auto-formatter dropped the import line for a just-used symbol.
+Any unresolved symbol → fail with rule ref `verify-adherence#import-resolution`, record
+`{module, name, file:line}`.
+
+**(b) Per-module test run.** For each touched module, run its matching test file(s):
+
+```bash
+uv run python -m pytest <touched-modules-test-files> -q
+```
+
+Catches per-module regressions seconds after the edit, before the full hygiene suite or
+deep review pays the cost. Failures record as `{test_id, rule_ref, file:line}` with rule
+ref `verify-adherence#per-module-tests`.
+
+Both checks are intentionally cheap. If either exceeds the 10 s budget, trim scope (fewer
+symbols, fewer test files) rather than skipping.
+
 ### 1. Mechanical suite (always first, never skip)
 
 Run the hygiene + discipline tests. These are cheap and definitive:
@@ -119,6 +149,8 @@ This ratchet is the whole point. Do not accept `semantic_findings` as a steady s
 
 ## Circuit breakers
 
+- Phase 1.0 cannot run (e.g., `uv` missing, `scripts/` unreadable) → ESCALATE; don't
+  silently skip. A broken cheap-check layer defeats the point.
 - Phase 1 fails to run (env broken) → ESCALATE; don't fall through.
 - Semantic subagent output lacks `file:line` or `suggested_test` → reject the output and
   flag as adherence-infrastructure bug. Don't silently accept.

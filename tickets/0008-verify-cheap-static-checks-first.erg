@@ -1,11 +1,14 @@
 %erg v1
 Title: /verify — cheap static checks before deep review
-Status: open
+Status: closed
 Created: 2026-04-17
 Author: user
 
 --- log ---
 2026-04-17T10:00Z claude created from verify reflection memo (PR 692)
+2026-04-17T12:26Z claude claimed
+2026-04-17T12:26Z claude note added phase 1.0 cheap static checks to verify-adherence SKILL.md (import resolution + per-module tests, <10s, blocking)
+2026-04-17T12:26Z claude status closed exit criteria met
 
 --- body ---
 ## Context
