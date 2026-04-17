@@ -40,8 +40,10 @@ failure stops the phase here and does not fall through to 1/2/3. Combined budget
 under `scripts/`. For each `(module, name)` pair:
 
 ```bash
-uv run python -c "import sys; sys.path.insert(0, 'scripts'); import M; getattr(M, 'name')"
+uv run python -c "import sys; sys.path.insert(0, 'scripts'); import <module>; getattr(<module>, '<symbol>')"
 ```
+
+Scope: touched `.py` files under `scripts/`. Modules outside that tree are not probed.
 
 Catches the formatter-strip-import class of bug: tests are green, but the first real run
 `NameError`s because an auto-formatter dropped the import line for a just-used symbol.
