@@ -1,0 +1,99 @@
+%erg v1
+Title: Post-hoc validator skill — re-resolve every DOI/URL in a related-work-note output
+Status: open
+Created: 2026-04-17
+Author: claude
+
+--- log ---
+2026-04-17T09:50Z claude created — migrated from ImperialDragonHarness#32 after realising IDH uses local .erg tickets for intra-project coordination (FORMAT.md). GH issue closed with pointer here.
+
+--- body ---
+## Context
+
+The `related-work-note` skill (committed 2026-04-17, `skills/related-work-note/SKILL.md`)
+instructs the invoked model to `WebFetch` every DOI and URL before
+emitting the note, and to drop or replace unresolved entries. This
+is a structural guard against hallucinated citations, which LLMs are
+notorious for producing in academic prose.
+
+The gap: the skill **specifies** the check, but does not **enforce**
+it. A model under load, a model on a budget, or a model that
+misreads the skill instructions can skip the resolution step and
+still emit a structurally valid note. The author-verification
+checklist catches the problem eventually — but only if the author
+bothers — and by then the bad citation may already be in the
+manuscript draft.
+
+An external validator skill, run after a note is emitted, closes
+the loop. Specify + enforce.
+
+## Requirements
+
+### What the validator does
+
+1. Read a note file at a caller-specified path.
+2. Parse the Bibliography section.
+3. For each entry: extract DOI and URL; `WebFetch` each; record 200
+   vs failure.
+4. Parse the Methods section for the "Identifier resolution" line
+   that the upstream skill was supposed to write.
+5. Compare the validator's results against the note's claim:
+   - If note claims "all N resolved" and validator confirms → append
+     PASS line to Methods.
+   - If note claims all resolved but validator finds failures →
+     append FAIL line listing failing entries.
+   - If the resolution line is missing → append MISSING line
+     (upstream skill misbehaved).
+
+### Output behaviour
+
+- The validator **does not rewrite the note**. It appends a
+  validator-provenance line to Methods in-place, so the author sees
+  both the LLM-side claim and the external check.
+- Prints one-line verdict to caller: `PASS`, `FAIL: N entries
+  unresolved`, or `MISSING: no resolution line in note`.
+- On FAIL, caller should re-run the upstream skill or manually fix
+  the note.
+
+### Non-requirements
+
+- No CI/hook integration. Manual skill, invoked after each
+  `related-work-note` run. Hook integration is a separate, harder
+  question.
+- No editing of cited-work bodies. Validator only touches Methods.
+- No Crossref metadata fetch. 200 OK is the bar; deeper validation
+  is the author's job.
+
+## Actions
+
+1. Draft `skills/related-work-note-validate/SKILL.md`. Accept a
+   note-file path as the sole argument.
+2. Test on a clean pilot note (the 2026-04-17 pilot at
+   `/tmp/skill-pilot/table-understanding-benchmarks.md` can serve
+   or be re-created).
+3. Test on a note with a deliberately broken DOI — validator must
+   FAIL and name the bad entry.
+4. Commit.
+
+## Test
+
+- [ ] Clean pilot note → `PASS`.
+- [ ] Note with broken DOI → `FAIL` naming the entry.
+- [ ] Note missing the resolution line → `MISSING`.
+- [ ] Validator never edits cited-work content — only appends to
+      Methods.
+
+## Exit criteria
+
+- `skills/related-work-note-validate/SKILL.md` committed, invocable
+  via Skill tool.
+- All three test cases above pass.
+- Operator has reviewed and approved.
+
+## Relationship
+
+- Complements `related-work-note` (specify + enforce).
+- First consumer: AEDIST journal paper §2 Related Work workflow
+  (AEDIST ticket 0077).
+- Migrated from `github.com/MinhHaDuong/ImperialDragonHarness/issues/32`;
+  the GH issue is closed and points at this ticket.

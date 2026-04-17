@@ -1,0 +1,95 @@
+%erg v1
+Title: Build skill — bib-merge (merge related-work-note bibliography block into refs.bib)
+Status: open
+Created: 2026-04-17
+Author: claude
+
+--- log ---
+2026-04-17T09:50Z claude created — migrated from ImperialDragonHarness#33 after realising IDH uses local .erg tickets for intra-project coordination (FORMAT.md). GH issue closed with pointer here.
+
+--- body ---
+## Context
+
+The `related-work-note` skill emits a Bibliography section
+containing BibTeX entries — one per cited work, alphabetical by
+first author, with DOI and stable URL on every entry. That block
+lives inside a markdown note, not in the manuscript's `refs.bib`.
+
+The skill explicitly excluded BibTeX integration from its own scope
+— the author wants to review citations **before** they enter the
+canonical bibliography. But after approval, the block still has to
+get into `refs.bib`, and doing that by hand is error-prone:
+
+- **Duplicates.** The note may re-declare an entry that already
+  exists under a different key (e.g. Gotzens 2019 under `LYGDCQCL`
+  in AEDIST's `refs.bib` but minted as `Gotzens2019` in the note).
+- **Lost metadata.** Pasting BibTeX by hand drops fields silently
+  (`doi`, `url`, `journal` easy to miss).
+- **Formatting drift.** Some projects use stable 8-character Zotero
+  keys; hand-minted keys pollute the key space.
+- **Dead entries.** If a draft is revised and a citation removed,
+  the `refs.bib` entry sticks around unreferenced.
+
+A skill closes the loop: parse note, dedupe, merge, report.
+
+## Requirements
+
+### What the skill does
+
+1. Inputs: note-file path, target `refs.bib` path (default:
+   `report/refs.bib` if it exists in cwd).
+2. Parse the Bibliography section of the note (the ```bibtex
+   fenced block).
+3. For each entry:
+   - If the entry's first author + year matches an existing
+     `refs.bib` entry, propose the existing key instead of minting
+     a new one. Flag to the caller.
+   - If truly new, keep the note's key. If the key collides with an
+     existing one for a **different** work, suffix-bump.
+4. Compare fields: if both note and refs.bib have a `doi` or `url`
+   and they differ, flag as a conflict; do not silently overwrite.
+5. Append new entries in the project's existing style (inspect
+   `refs.bib` to detect key style, field order, indentation).
+6. Report: entries merged / skipped / deduped / conflicts.
+
+### What it does not do
+
+- Remove unreferenced entries. That is a separate linter task.
+- Fetch missing metadata from Crossref. Enrichment is the author's
+  job.
+- Reorder `refs.bib` beyond appending new entries.
+
+## Actions
+
+1. Draft `skills/bib-merge/SKILL.md`.
+2. Test the happy path (no overlaps → N entries added).
+3. Test the dedupe path (author+year match existing key → flagged,
+   no duplicate).
+4. Test the conflict path (same author+year, different DOI →
+   flagged, not overwritten).
+5. Optional: dry-run mode reports what would happen.
+
+## Test
+
+- [ ] Fresh note, no overlaps: adds N entries, reports N merged.
+- [ ] Note entry matches existing `refs.bib` entry (different key):
+      dedupe flagged, no double-add.
+- [ ] Note entry has different DOI from existing match: conflict
+      flagged, no overwrite.
+- [ ] Dry-run mode (if implemented) does not modify `refs.bib`.
+
+## Exit criteria
+
+- `skills/bib-merge/SKILL.md` committed, invocable via Skill tool.
+- All four test cases above pass.
+- Operator has reviewed and approved.
+
+## Relationship
+
+- Consumes output of `related-work-note`.
+- Orthogonal to ticket 0011 (validator): bib-merge trusts the note;
+  validation is a separate pass.
+- First consumer: AEDIST journal paper §2 Related Work workflow
+  (AEDIST ticket 0077).
+- Migrated from `github.com/MinhHaDuong/ImperialDragonHarness/issues/33`;
+  the GH issue is closed and points at this ticket.
