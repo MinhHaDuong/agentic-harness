@@ -1,0 +1,44 @@
+%erg v1
+Title: Add set -euo pipefail to all hook scripts
+Status: open
+Created: 2026-04-23
+Author: claude
+
+--- log ---
+2026-04-23T12:30Z claude created — celebrate sweep on 0015; 7 scripts lack error handling
+
+--- body ---
+## Context
+
+/celebrate sweep after PR #51 (CI workflow) found 7 hook scripts missing
+`set -euo pipefail`. Silent failures in hook scripts are dangerous: a broken
+guard (e.g., `guard-commit-on-main.sh`) may exit 0 despite an error,
+silently allowing what it was meant to block.
+
+Affected files:
+- scripts/guard-destructive-bash.sh
+- scripts/block-pr-merge-in-worktree.sh
+- scripts/shell-init.sh
+- scripts/guard-commit-on-main.sh
+- scripts/lint-on-edit.sh
+- scripts/warn-stale-rules.sh
+- scripts/on-start.sh
+
+## Actions
+
+1. Add `set -euo pipefail` as the second line (after the shebang) in each
+   script. Review each for commands that legitimately may fail (grep, test)
+   and add `|| true` where needed.
+2. Add a CI check to `CI.yml` (requires 0015, now merged): grep all
+   `scripts/*.sh` for `set -euo pipefail`; fail if any are missing.
+   This becomes the standing regression guard.
+
+## Test
+
+Remove `set -euo pipefail` from one script; expect CI red.
+
+## Exit criteria
+
+- All `scripts/*.sh` have `set -euo pipefail`.
+- CI job enforces it.
+- No hook regression (manual smoke: trigger each hook scenario once).

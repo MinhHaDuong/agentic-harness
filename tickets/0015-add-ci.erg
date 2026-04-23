@@ -1,6 +1,6 @@
 %erg v1
 Title: add CI — validator + skill sanity on PR/push
-Status: pending
+Status: closed
 Created: 2026-04-17
 Author: claude
 
@@ -51,3 +51,4 @@ broken /verify, a malformed ticket) propagates.
 3. Scope `/verify-wave` for multi-PR integration review (listed as
    "not in scope" in current SKILL.md — a mechanical green signal on
    the integration branch is the precondition that makes it feasible).
+2026-04-23T13:08Z claude status closed — PR #51 merged, CI green on main
