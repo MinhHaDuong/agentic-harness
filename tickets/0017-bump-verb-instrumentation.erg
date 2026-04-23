@@ -1,6 +1,6 @@
 %erg v1
 Title: Instrument ticket logs with bump verb to separate trivial from hard stoppages
-Status: open
+Status: closed
 Created: 2026-04-23
 Author: claude
 
@@ -118,3 +118,4 @@ must not flag their absence.
 
 - Supersedes cadens ticket 0019 (same spec, wrong repo).
 - Depends on nothing; can start immediately.
+2026-04-23T09:38Z claude status closed — PR #50 merged
