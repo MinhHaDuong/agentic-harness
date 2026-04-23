@@ -55,3 +55,13 @@ jobs:
             exit 1
           fi
           echo "OK: deliberate leak caught"
+      - name: Self-test — escape hatch must suppress a leak
+        run: |
+          tmp=$(mktemp -d)
+          mkdir -p "$tmp/skills"
+          echo '<!-- harness-extension-point --> /home/haduong/CNRS/papiers/actif/SomeProject' > "$tmp/skills/SKILL.md"
+          if ! bash scripts/check-project-leak.sh "$tmp/skills"; then
+            echo "FAIL: escape hatch did not suppress the leak"
+            exit 1
+          fi
+          echo "OK: escape hatch suppressed leak"
