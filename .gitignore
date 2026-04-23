@@ -18,6 +18,9 @@
 !docs/**
 !tickets/
 !tickets/**
+# Exclude compiled Go binaries from ticket tools
+tickets/tools/go/git-erg
+tickets/tools/go/*.test
 
 # settings.json: universal config (hooks, effortLevel, universal permissions) — tracked
 # settings.local.json: machine-specific permissions — gitignored

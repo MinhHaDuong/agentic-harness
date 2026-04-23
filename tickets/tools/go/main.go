@@ -238,7 +238,12 @@ var (
 
 // validateLogLine checks a single log line for format and bump-category validity.
 // Returns nil if valid, or a descriptive error if invalid.
+// Indented continuation lines (RFC 822 style) are accepted as-is.
 func validateLogLine(line string) error {
+	// Accept indented continuation lines (RFC 822 folding convention).
+	if len(line) > 0 && (line[0] == ' ' || line[0] == '\t') {
+		return nil
+	}
 	trimmed := strings.TrimSpace(line)
 	if trimmed == "" {
 		return nil

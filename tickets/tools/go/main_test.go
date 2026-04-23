@@ -41,6 +41,11 @@ func TestBumpVerbValidation(t *testing.T) {
 			line:    "2026-04-23T09:00Z claude note anything goes here",
 			wantErr: false,
 		},
+		{
+			name:    "indented continuation line accepted",
+			line:    "  Handoff from cadens run — continuation of previous entry",
+			wantErr: false,
+		},
 	}
 
 	for _, tc := range cases {

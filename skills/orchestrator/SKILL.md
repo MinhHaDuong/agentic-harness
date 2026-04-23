@@ -135,18 +135,21 @@ Autonomous mode: ralph loop to next wave.
 
 ## Circuit breakers
 
+All three triggers below require a bump log line written to the **main-repo**
+`tickets/` directory (not the killed agent's worktree copy), committed before
+relaunching: `{ISO8601} claude bump circuit-breaker — {reason}`.
+
 **Agent timeout**: If an agent has not pushed within 10 minutes,
 kill it. Split the ticket or relaunch with narrower scope.
-Append a bump line to the ticket in the **main repo** `tickets/` directory
-(not the killed agent's worktree): `{ISO8601} claude bump circuit-breaker — agent timeout`. Commit this line before relaunching.
+Bump reason: `agent timeout`.
 
 **Ping-pong detector**: If two agents edit the same file on the
 same branch, STOP. Reset to last known-good commit, relaunch ONE agent.
-Append a bump line: `{ISO8601} claude bump circuit-breaker — ping-pong on {file}`. Commit this line before relaunching.
+Bump reason: `ping-pong on {file}`.
 
 **Redirect ban**: Do not use SendMessage to redirect a running
 agent. Kill and relaunch with corrected instructions.
-Append a bump line: `{ISO8601} claude bump circuit-breaker — redirect ban triggered`. Commit this line before relaunching.
+Bump reason: `redirect ban triggered`.
 
 **Escalation**: If the same fix fails twice, stop and leave a
 ticket comment with the two failed approaches.

@@ -6,7 +6,9 @@ Author: claude
 
 --- log ---
 2026-04-23T09:30Z claude created
-2026-04-23T09:30Z claude note handoff from cadens 0019 — all targets are in global harness
+  Handoff from cadens orchestration run 2026-04-23. Originally filed as
+  cadens ticket 0019 but all targets are in the global harness (~/.claude),
+  not in cadens. Refiled here as the correct home.
 2026-04-23T00:00Z haduong note action-1: tickets.md goes in skills/harness-rules/, not a new rules/ directory
 2026-04-23T10:00Z claude claimed
 2026-04-23T10:30Z claude status in-review — PR #50
