@@ -1,11 +1,13 @@
 %erg v1
 Title: add CI — validator + skill sanity on PR/push
-Status: open
+Status: pending
 Created: 2026-04-17
 Author: claude
 
 --- log ---
 2026-04-17T15:36Z claude created — part of the "CI across active repos" batch
+2026-04-23T00:00Z claude claimed
+2026-04-23T00:01Z claude status pending — PR #51 opened
 
 --- body ---
 ## Context

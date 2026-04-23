@@ -6,6 +6,8 @@
 !README.md
 !STATE.md
 !CLAUDE.md
+!.github/
+!.github/**
 !skills/
 !skills/**
 !scripts/
@@ -20,6 +22,7 @@
 !tickets/**
 # Exclude compiled Go binaries from ticket tools
 tickets/tools/go/git-erg
+tickets/tools/go/erg
 tickets/tools/go/*.test
 
 # settings.json: universal config (hooks, effortLevel, universal permissions) — tracked

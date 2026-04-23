@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  validate-tickets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+      - name: Build erg validator
+        working-directory: tickets/tools/go
+        run: go build -o erg .
+      - name: Validate tickets
+        run: ./tickets/tools/go/erg validate tickets/
+
+  skill-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check SKILL.md frontmatter
+        run: |
+          fail=0
+          for f in skills/*/SKILL.md; do
+            front=$(sed -n '/^---$/,/^---$/p' "$f" | sed '1d;$d')
+            if ! echo "$front" | grep -q '^name:'; then
+              echo "FAIL: $f missing 'name:' in frontmatter"
+              fail=1
+            fi
+            if ! echo "$front" | grep -q '^description:'; then
+              echo "FAIL: $f missing 'description:' in frontmatter"
+              fail=1
+            fi
+          done
+          exit $fail
