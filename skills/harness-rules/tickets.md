@@ -45,5 +45,5 @@ Actor is typically `claude` or `haduong`. Detail is free text after the verb.
   The category distinguishes trivial stoppages (permission, circuit-breaker) from hard ones (author-decision, test-failure).
 - Use **`note`** for informational annotations that do not represent a stoppage.
 
-Write bump lines to the main-repo ticket file at `/home/haduong/.claude/tickets/{ticket}.erg`,
+Write bump lines to the main-repo ticket file at `~/.claude/tickets/{ticket}.erg`,
 not to any worktree copy.

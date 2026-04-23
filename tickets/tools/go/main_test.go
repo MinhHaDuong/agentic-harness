@@ -22,6 +22,21 @@ func TestBumpVerbValidation(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			name:    "valid bump author-decision",
+			line:    "2026-04-23T09:00Z claude bump author-decision — non-autonomous call",
+			wantErr: false,
+		},
+		{
+			name:    "valid bump test-failure",
+			line:    "2026-04-23T09:00Z claude bump test-failure — make check failed",
+			wantErr: false,
+		},
+		{
+			name:    "valid bump verify-reroll",
+			line:    "2026-04-23T09:00Z claude bump verify-reroll — round 1: missing tests",
+			wantErr: false,
+		},
+		{
 			name:    "invalid bump category",
 			line:    "2026-04-23T09:00Z claude bump unknown-category — foo",
 			wantErr: true,

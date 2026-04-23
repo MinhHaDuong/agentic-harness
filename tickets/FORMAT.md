@@ -108,7 +108,7 @@ Append-only. Each line records one event:
 | `claimed` | Agent is starting work (also writes `.wip` file) |
 | `released` | Agent released claim without completing |
 | `note` | Free-form annotation |
-| `bump {category}` | Agent paused waiting for a human signal. Category is mandatory and must be one of: `permission`, `author-decision`, `test-failure`, `verify-reroll`, `circuit-breaker`. |
+| `bump {category} — {detail}` | Agent paused waiting for a human signal. Category is mandatory and must be one of: `permission`, `author-decision`, `test-failure`, `verify-reroll`, `circuit-breaker`. |
 
 Lines are never edited or deleted. To correct an error, append a new line.
 
