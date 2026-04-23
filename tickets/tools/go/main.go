@@ -226,7 +226,37 @@ var (
 	filenameRE = regexp.MustCompile(`^\d{4}-[a-z0-9]+(-[a-z0-9]+)*\.erg$`)
 	// Log line: ISO timestamp, space, actor, space, verb [detail]
 	logLineRE = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}Z\s+\S+\s+\S+`)
+
+	validBumpCategories = map[string]bool{
+		"permission":      true,
+		"author-decision": true,
+		"test-failure":    true,
+		"verify-reroll":   true,
+		"circuit-breaker": true,
+	}
 )
+
+// validateLogLine checks a single log line for format and bump-category validity.
+// Returns nil if valid, or a descriptive error if invalid.
+func validateLogLine(line string) error {
+	trimmed := strings.TrimSpace(line)
+	if trimmed == "" {
+		return nil
+	}
+	if !logLineRE.MatchString(trimmed) {
+		return fmt.Errorf("malformed log line: %q", trimmed)
+	}
+	fields := strings.Fields(trimmed)
+	if len(fields) >= 3 && fields[2] == "bump" {
+		if len(fields) < 4 {
+			return fmt.Errorf("bump verb requires a category; valid: permission, author-decision, test-failure, verify-reroll, circuit-breaker")
+		}
+		if !validBumpCategories[fields[3]] {
+			return fmt.Errorf("unknown bump category %q; valid: permission, author-decision, test-failure, verify-reroll, circuit-breaker", fields[3])
+		}
+	}
+	return nil
+}
 
 func validateErg(t *Erg, allIDs map[string]bool) []string {
 	var errors []string
@@ -284,12 +314,10 @@ func validateErg(t *Erg, allIDs map[string]bool) []string {
 		}
 	}
 
-	// Rule 10: log lines match format
+	// Rule 10: log lines match format (and bump verb has valid category)
 	for _, line := range t.LogLines {
-		trimmed := strings.TrimSpace(line)
-		if trimmed != "" && !logLineRE.MatchString(trimmed) {
-			errors = append(errors, fmt.Sprintf(
-				"%s: malformed log line: %s", name, trimmed))
+		if err := validateLogLine(line); err != nil {
+			errors = append(errors, fmt.Sprintf("%s: %s", name, err))
 		}
 	}
 
@@ -1046,7 +1074,7 @@ func printUsage() {
 	fmt.Fprintln(os.Stderr, "Usage: erg <command> [args...]")
 	fmt.Fprintln(os.Stderr)
 	fmt.Fprintln(os.Stderr, "Commands:")
-	fmt.Fprintln(os.Stderr, "  validate [dir|files...]   Validate %erg v1 files")
+	fmt.Fprintf(os.Stderr, "  validate [dir|files...]   Validate %%erg v1 files\n")
 	fmt.Fprintln(os.Stderr, "  ready [dir] [--json]      Show tickets ready for work")
 	fmt.Fprintln(os.Stderr, "  archive [dir] [--days N] [--execute]  Archive old closed tickets")
 	fmt.Fprintln(os.Stderr, "  graph [dir] [--json]      Show ticket dependency DAG")
