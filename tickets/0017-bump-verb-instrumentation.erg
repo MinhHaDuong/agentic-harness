@@ -1,0 +1,118 @@
+%erg v1
+Title: Instrument ticket logs with bump verb to separate trivial from hard stoppages
+Status: open
+Created: 2026-04-23
+Author: claude
+
+--- log ---
+2026-04-23T09:30Z claude created
+  Handoff from cadens orchestration run 2026-04-23. Originally filed as
+  cadens ticket 0019 but all targets are in the global harness (~/.claude),
+  not in cadens. Refiled here as the correct home.
+2026-04-23T00:00Z haduong note action-1: tickets.md goes in skills/harness-rules/, not a new rules/ directory
+
+--- body ---
+## Context
+
+Overnight autonomous orchestration runs mix two failure modes that look
+identical to the supervising human but are structurally very different:
+
+- **Trivial stoppages** — the harness asked for permission on a tool call
+  the user has implicitly authorised (the tenth `gh pr create` of the night).
+  Fixable via the allowlist in `.claude/settings.json`.
+- **Hard stoppages** — the agent genuinely needs input: an author decision,
+  a failing test, a `/verify-gate` REROLL, a circuit-breaker kill.
+
+The current ticket log has five verbs: `created`, `status`, `claimed`,
+`released`, `note`. None encode "agent paused and waited for a human signal".
+All stoppages fold into free-form `note` lines or are lost.
+
+Motivating case: ticket 0017 (paper reconsideration) in the cadens
+project — the overnight orchestration run stopped multiple times and the
+log gave no signal about which stops were trivial vs. genuine.
+
+## Actions
+
+1. **Write `~/.claude/skills/harness-rules/tickets.md`.**
+   Document the full verb set including the new `bump` verb. Place alongside
+   workflow.md, git.md, coding.md, state.md.
+
+   Verb table addition:
+   ```
+   bump {category} — {detail}
+   ```
+   Categories (closed set):
+   - `permission` — harness blocked a tool call awaiting user approval
+   - `author-decision` — agent judged a call non-autonomous and stopped
+   - `test-failure` — `make` / pytest / CI failed
+   - `verify-reroll` — `/verify-gate` returned REROLL or ESCALATE
+   - `circuit-breaker` — orchestrator killed the agent (timeout, ping-pong)
+
+2. **Update `~/.claude/tickets/tools/go/main.go`** to accept `bump` as a
+   valid verb and validate the category against the closed set. Reject
+   unknown categories at commit time.
+
+   The current validator uses a loose regex for log lines
+   (`timestamp actor verb [anything]`). Extend it to parse the verb token
+   and, when it is `bump`, validate the next token against the five
+   categories above.
+
+   Add a test case: a line `2026-04-23T09:00Z claude bump permission —
+   awaiting gh pr create` should parse cleanly; a line
+   `... bump unknown-category — ...` should fail with a clear error.
+
+3. **Update the orchestrator skill** (`~/.claude/skills/orchestrator`)
+   to emit `bump circuit-breaker` when a circuit breaker fires (agent
+   timeout, ping-pong detector, redirect ban).
+
+4. **Update the `/verify-gate` skill** to emit `bump verify-reroll` in
+   the REROLL path.
+
+5. **Add a bump tally to the orchestrator wrap-up.** After all waves,
+   print a summary like:
+
+   ```
+   Ticket 0017: 12 bumps (9 permission, 1 author-decision, 2 test-failure)
+     → 75% trivial — next allowlist pass should absorb them
+   ```
+
+6. (Optional / defer) Update `ticket-claim` / `ticket-close` skills to
+   emit `bump author-decision` when an agent calls `AskUserQuestion`.
+   Requires passing ticket ID through agent prompts, which they currently
+   do not.
+
+## Test (first TDD red step)
+
+In `~/.claude/tickets/tools/go/`: add a test case that:
+- A log line `2026-04-23T09:00Z claude bump permission — awaiting gh pr create`
+  parses cleanly.
+- A line `2026-04-23T09:00Z claude bump unknown-category — foo` fails
+  validation with an error naming the valid category set.
+
+Existing closed tickets have no `bump` lines — that is fine. The validator
+must not flag their absence.
+
+## Exit criteria
+
+- `~/.claude/skills/harness-rules/tickets.md` exists, §Verbs lists `bump` with its 5
+  categories.
+- erg validator (Go) accepts `bump {category} — {detail}` and rejects
+  unknown categories; test cases cover both.
+- At least one skill (`/verify-gate`) emits `bump verify-reroll` in the
+  REROLL path, proving the end-to-end flow.
+- Orchestrator wrap-up prints a bump-category tally at the end of an
+  autonomous run.
+- No breakage of existing ticket validation.
+
+## Non-goals
+
+- Changing `%erg` to v2. This is an additive verb.
+- Retroactively annotating closed tickets.
+- Instrumenting every agent prompt path — focus on the three highest-signal
+  points: permission blocks, verify-gate REROLL, circuit breakers.
+- Replacing the `note` verb. `bump` is additive.
+
+## Relationships
+
+- Supersedes cadens ticket 0019 (same spec, wrong repo).
+- Depends on nothing; can start immediately.
