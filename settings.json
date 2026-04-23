@@ -13,7 +13,10 @@
       "Bash(git commit -m ' *)",
       "Bash(git push *)",
       "Bash(gh repo *)",
-      "Bash(gh api *)"
+      "Bash(gh api *)",
+      "Edit(/.claude/skills/start-ticket/**)",
+      "Bash(uv sync *)",
+      "Bash(git merge *)"
     ]
   },
   "model": "sonnet",
@@ -76,12 +79,11 @@
     ],
     "Stop": []
   },
-  "effortLevel": "high",
+  "effortLevel": "xhigh",
+  "advisorModel": "opus",
   "voice": {
     "enabled": true,
     "mode": "hold"
   },
-  "skipDangerousModePermissionPrompt": true,
-  "voiceEnabled": true,
-  "advisorModel": "opus"
+  "skipDangerousModePermissionPrompt": true
 }
