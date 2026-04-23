@@ -1,6 +1,6 @@
 %erg v1
 Title: standing guard — IDH tickets/skills must not encode project-specific assumptions
-Status: doing
+Status: closed
 Created: 2026-04-17
 Author: claude
 
@@ -8,6 +8,7 @@ Author: claude
 2026-04-17T16:30Z claude created — /celebrate sweep found a recurring class: tickets 0001, 0002, 0003, 0006 were all carved out after leaking consumer-project pain into harness-generic skills.
 2026-04-23T13:11Z claude claimed
 2026-04-23T13:11Z claude status doing — implementing CI leak-guard job + check script
+2026-04-23T14:00Z claude status closed — PR #53 merged, CI green on main
 
 --- body ---
 ## Context
