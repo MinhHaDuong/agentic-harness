@@ -6,6 +6,8 @@ Author: claude
 
 --- log ---
 2026-04-17T16:30Z claude created — /celebrate sweep found a recurring class: tickets 0001, 0002, 0003, 0006 were all carved out after leaking consumer-project pain into harness-generic skills.
+2026-04-23T13:11Z claude claimed
+2026-04-23T13:11Z claude status doing — implementing CI leak-guard job + check script
 
 --- body ---
 ## Context
@@ -62,6 +64,3 @@ Decide at implementation time; all three are cheap.
 - A deliberate leak is caught in a test fixture.
 - Documented escape hatch for legitimate harness-extension-point
   references.
-
-2026-04-23T13:11Z claude claimed
-2026-04-23T13:11Z claude status doing — implementing CI leak-guard job + check script
