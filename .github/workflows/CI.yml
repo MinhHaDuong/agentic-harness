@@ -38,3 +38,10 @@ jobs:
             fi
           done
           exit $fail
+
+  leak-guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check for consumer-project assumptions in skills and tickets
+        run: bash scripts/check-project-leak.sh

@@ -1,6 +1,6 @@
 %erg v1
 Title: standing guard — IDH tickets/skills must not encode project-specific assumptions
-Status: open
+Status: doing
 Created: 2026-04-17
 Author: claude
 
@@ -62,3 +62,6 @@ Decide at implementation time; all three are cheap.
 - A deliberate leak is caught in a test fixture.
 - Documented escape hatch for legitimate harness-extension-point
   references.
+
+2026-04-23T13:11Z claude claimed
+2026-04-23T13:11Z claude status doing — implementing CI leak-guard job + check script
