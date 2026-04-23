@@ -38,3 +38,30 @@ jobs:
             fi
           done
           exit $fail
+
+  leak-guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check for consumer-project assumptions in skills and tickets
+        run: bash scripts/check-project-leak.sh
+      - name: Self-test — script must catch a deliberate leak
+        run: |
+          tmp=$(mktemp -d)
+          mkdir -p "$tmp/skills"
+          echo '/home/haduong/CNRS/papiers/actif/SomeProject' > "$tmp/skills/SKILL.md"
+          if bash scripts/check-project-leak.sh "$tmp/skills"; then
+            echo "FAIL: leak-guard did not catch the deliberate leak"
+            exit 1
+          fi
+          echo "OK: deliberate leak caught"
+      - name: Self-test — escape hatch must suppress a leak
+        run: |
+          tmp=$(mktemp -d)
+          mkdir -p "$tmp/skills"
+          echo '<!-- harness-extension-point --> /home/haduong/CNRS/papiers/actif/SomeProject' > "$tmp/skills/SKILL.md"
+          if ! bash scripts/check-project-leak.sh "$tmp/skills"; then
+            echo "FAIL: escape hatch did not suppress the leak"
+            exit 1
+          fi
+          echo "OK: escape hatch suppressed leak"
