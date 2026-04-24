@@ -3,7 +3,7 @@ name: verify-adherence
 description: Check a branch's diff against project rules. Mechanical-first — runs hygiene tests + grep ratchet before falling back to LLM. Emits suggested tests for any semantic finding so the LLM surface shrinks over time.
 disable-model-invocation: false
 user-invocable: true
-argument-hint: <branch-or-pr-number>
+argument-hint: <branch>
 context: fork
 ---
 
@@ -27,8 +27,7 @@ rule is permanently enforced → never needs LLM again.
 
 ## Input
 
-<!-- harness-extension-point: gh pr view — forge-agnostic rework tracked in IDH ticket 0020 -->
-One argument: a branch name or merge-request number. Resolve MR → branch via forge CLI (currently: `gh pr view --json headRefName`).
+One argument: a branch name.
 
 ## Phases
 

@@ -31,19 +31,13 @@ Merge is always the human's or the orchestrator's call.
 
 ### 1. Setup
 
-<!-- harness-extension-point: forge CLI checkout — currently gh pr checkout; rework tracked in IDH ticket 0020 -->
 - Check out the merge-request branch into an isolated worktree. Abort if not mergeable
   or if there are open merge conflicts.
 - Collect:
   - The ticket file referenced in the PR title or body (`tickets/*.erg`).
   - PR body, full diff, all existing review comments, all inline comments, all commit
     messages on the branch.
-<!-- harness-extension-point: gh pr checks — forge-agnostic rework tracked in IDH ticket 0020 -->
-- Run CI status checks for the merge request. If no checks are reported (repo has
-  none configured), post a one-off informational comment `verify: CI gap — no CI
-  checks reported for this PR` and continue. Not a bounce — visible to the reviewer,
-  not a blocker. Skip if any prior `verify: CI gap` comment already exists on the PR
-  (idempotency across round 2). Pending or completed checks are not a gap; say nothing.
+- Check CI status for the merge request if the forge exposes it. If the forge CLI or API is unavailable, skip gracefully — CI status is informational only. If checks are configured and any are failing, note this in the setup summary; do not block on it (reviewer decides).
 - If any of these cannot be located, ESCALATE with a clear message. Do not proceed.
 
 ### 2–4. Read-only review fan-out (parallel)
