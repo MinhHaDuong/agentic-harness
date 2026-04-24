@@ -8,7 +8,9 @@ A reusable, science-backed personal harness for AI-assisted research: code and p
 
 ## Status
 
-Level 4 (Hooks) + orchestrator + `/verify` loop + git-erg tickets + bibliography pipeline all shipped. Skills slimmed to non-obvious constraints only. Shell init harness-tracked (`scripts/shell-init.sh`). CI live on main (validate-tickets + skill-lint + leak-guard + pipefail-guard). Harness-rules now cover build structure: split by workpackage, commit handoff artifacts. Forge-agnostic: leak-guard enforces no `gh`/`github.com` in skills; verify skills and coding rules decoupled from stack assumptions.
+Level 4 (Hooks) + orchestrator + `/verify` loop + git-erg tickets + bibliography pipeline all shipped. Skills slimmed to non-obvious constraints only. Shell init harness-tracked (`scripts/shell-init.sh`). CI live on main: validate-tickets + skill-lint + leak-guard + pipefail-guard.
+
+**Forge-agnostic**: leak-guard enforces no `gh`/`github.com` in skills; verify/verify-adherence/verify-gate have no forge-specific assumptions. Coding rules (coding-python.md) loaded conditionally for Python projects only. Adherence ratchet protocol is stack-agnostic.
 
 Field testing on a handful of projects: data analysis in Python and academic writing in LaTeX and QMD. Four projects have ticketed split-build work (Cadens 0022, Fuzzy Corpus 0023, AEDIST 0112, Climate Finance 0093).
 
