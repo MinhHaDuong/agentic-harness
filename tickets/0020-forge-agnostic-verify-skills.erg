@@ -6,6 +6,7 @@ Author: claude
 
 --- log ---
 2026-04-24T00:00Z claude created — leak-guard now catches \bgh \b in skills; three escape hatches mark the remaining violations
+2026-04-24T00:00Z claude note reimagine — simplest path: require branch-name input in both skills (drop PR-number resolution); CI-status check becomes best-effort with graceful skip; block-pr-merge-in-worktree.sh is out of scope (script, not skill). Three focused skill edits, zero new abstractions.
 
 --- body ---
 ## Context

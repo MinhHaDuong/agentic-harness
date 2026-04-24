@@ -6,6 +6,7 @@ Author: claude
 
 --- log ---
 2026-04-23T12:30Z claude created — celebrate sweep on 0015; 7 scripts lack error handling
+2026-04-24T00:00Z claude note reimagine — 6 scripts, not 7: shell-init.sh is sourced (not executed), adding pipefail would break interactive shells. lint-on-edit.sh and warn-stale-rules.sh need || true on ruff/grep calls. CI check: grep -L with named exclusion for shell-init.sh.
 
 --- body ---
 ## Context
