@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 # SessionStart hook: load env vars, enforce worktree isolation.
 # Runs at the beginning of every Claude Code session.
 
@@ -7,8 +8,8 @@
 persist_env() {
     local envfile="$1"
     [ -f "$envfile" ] || return 0
-    [ -n "$CLAUDE_ENV_FILE" ] || return 0
-    grep -v '^\s*#' "$envfile" | grep -v '^\s*$' | sed 's/^export //' >> "$CLAUDE_ENV_FILE"
+    [ -n "${CLAUDE_ENV_FILE:-}" ] || return 0
+    grep -v '^\s*#' "$envfile" | grep -v '^\s*$' | sed 's/^export //' >> "$CLAUDE_ENV_FILE" || true
 }
 
 # User-level env
@@ -35,10 +36,10 @@ fi
 exec >/dev/null 2>&1
 
 # Everything below requires a project directory
-[ -n "$CLAUDE_PROJECT_DIR" ] && cd "$CLAUDE_PROJECT_DIR" || exit 0
+[ -n "${CLAUDE_PROJECT_DIR:-}" ] && cd "$CLAUDE_PROJECT_DIR" || exit 0
 
 # Project-level env (skip if same as user-level to avoid duplication)
-if [ "$(readlink -f "$CLAUDE_PROJECT_DIR/.env" 2>/dev/null)" != "$(readlink -f "$HOME/.claude/.env" 2>/dev/null)" ]; then
+if [ "$(readlink -f "${CLAUDE_PROJECT_DIR:-}/.env" 2>/dev/null)" != "$(readlink -f "$HOME/.claude/.env" 2>/dev/null)" ]; then
     persist_env "$CLAUDE_PROJECT_DIR/.env"
 fi
 

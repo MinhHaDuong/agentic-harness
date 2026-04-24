@@ -65,3 +65,28 @@ jobs:
             exit 1
           fi
           echo "OK: escape hatch suppressed leak"
+
+  pipefail-guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: All hook scripts must have set -euo pipefail
+        run: |
+          missing=$(grep -L 'set -euo pipefail' scripts/*.sh | grep -v 'shell-init\.sh')
+          if [ -n "$missing" ]; then
+            echo "FAIL: missing set -euo pipefail in:"
+            echo "$missing"
+            exit 1
+          fi
+          echo "OK: all hook scripts have set -euo pipefail"
+      - name: Self-test — guard must catch a script without pipefail
+        run: |
+          tmp=$(mktemp --suffix=.sh)
+          echo '#!/bin/bash' > "$tmp"
+          echo 'echo hello' >> "$tmp"
+          missing=$(grep -L 'set -euo pipefail' "$tmp")
+          if [ -z "$missing" ]; then
+            echo "FAIL: guard did not catch missing pipefail"
+            exit 1
+          fi
+          echo "OK: guard catches missing pipefail"

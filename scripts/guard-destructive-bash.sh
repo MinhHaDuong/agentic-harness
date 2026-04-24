@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 # PreToolUse hook: block destructive Bash commands.
 # Exit 0 = allow, Exit 2 = deny with message.
 

@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 # PostToolUse hook: run ruff on edited Python files.
 # Feeds errors back to the agent so it can self-correct.
 
@@ -14,11 +15,11 @@ file_path=$(echo "$input" | jq -r '.tool_input.file_path // empty')
 
 # Run ruff check (fix safe violations) then format
 if command -v uv &>/dev/null; then
-    output=$(uv run ruff check --fix --quiet "$file_path" 2>&1)
-    uv run ruff format --quiet "$file_path" 2>/dev/null
+    output=$(uv run ruff check --fix --quiet "$file_path" 2>&1 || true)
+    uv run ruff format --quiet "$file_path" 2>/dev/null || true
 elif command -v ruff &>/dev/null; then
-    output=$(ruff check --fix --quiet "$file_path" 2>&1)
-    ruff format --quiet "$file_path" 2>/dev/null
+    output=$(ruff check --fix --quiet "$file_path" 2>&1 || true)
+    ruff format --quiet "$file_path" 2>/dev/null || true
 else
     exit 0  # no linter available
 fi

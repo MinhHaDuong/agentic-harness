@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 # PreToolUse hook: block git commit on main/master branch.
 # Enforces the "main is read-only" rule from git.md.
 
@@ -16,7 +17,7 @@ cmd=$(echo "$input" | jq -r '.tool_input.command // empty')
 echo "$cmd" | grep -qE '\bgit\s+commit\b' || exit 0
 
 # Get current branch
-branch=$(git branch --show-current 2>/dev/null)
+branch=$(git branch --show-current 2>/dev/null || true)
 
 if [ "$branch" = "main" ] || [ "$branch" = "master" ]; then
     echo "BLOCKED: committing directly to $branch. Create a branch first: git switch -c <branch-name>" >&2

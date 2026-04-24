@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 # Block "gh pr merge" inside a git worktree.
 # Matcher in settings.json ensures this only runs for "gh pr merge" commands.
 
