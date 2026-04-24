@@ -1,6 +1,6 @@
 # Imperial Dragon Harness — State
 
-Last updated: 2026-04-23
+Last updated: 2026-04-24
 
 ## North star
 
@@ -12,11 +12,10 @@ Level 4 (Hooks) + orchestrator + `/verify` loop + git-erg tickets + bibliography
 
 Field testing on a handful of projects: data analysis in Python and academic writing in LaTeX and QMD. Four projects have ticketed split-build work (Cadens 0022, Fuzzy Corpus 0023, AEDIST 0112, Climate Finance 0093).
 
-## Open tickets (3)
+## Open tickets (2)
 
 - 0013 — bib-to-zotero (push refs.bib to Zotero via API at submission)
 - 0018 — shell-pipefail-guard (add `set -euo pipefail` to 7 hook scripts + CI check)
-- 0019+ — four project-side split-build tickets (filed, not yet committed in project repos)
 
 ## Blockers
 
