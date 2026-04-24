@@ -29,6 +29,12 @@ rule is permanently enforced → never needs LLM again.
 
 One argument: a branch name.
 
+## Protocol
+
+Any project using this skill must expose a command or test suite that emits verdicts in the schema defined in `## Phases → 4. Emit verdict`. The harness calls that entry point; the project owns what runs internally.
+
+Python projects fulfill the protocol via `@pytest.mark.adherence` tests invoked by `uv run python -m pytest`. A Go project would expose `go test -run Adherence ./...`; a LaTeX project might expose a `make check-adherence` target that runs a custom linter. The stack is the project's concern; the verdict schema is the harness's concern.
+
 ## Phases
 
 **Label skip.** When called from `/verify`, if the PR carries the
