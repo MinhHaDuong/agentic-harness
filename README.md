@@ -23,7 +23,7 @@ ImperialDragonHarness/
 │   │   ├── SKILL.md
 │   │   ├── workflow.md         # Session start, escalation, worktree
 │   │   ├── git.md              # Branch, commit, PR discipline
-│   │   ├── coding.md           # Python style, testing, Make
+│   │   ├── coding-python.md    # Python style, testing, Make (load when Python project)
 │   │   ├── state.md            # STATE.md format spec
 │   │   └── tickets.md          # Ticket log verbs including bump categories
 │   ├── orchestrator/       # Autonomous batch across multiple tickets
