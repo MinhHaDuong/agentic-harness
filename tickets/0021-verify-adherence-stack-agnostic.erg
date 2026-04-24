@@ -1,6 +1,6 @@
 %erg v1
 Title: Decouple verify-adherence ratchet from Python/pytest
-Status: open
+Status: in-progress
 Created: 2026-04-24
 Author: claude
 
@@ -8,6 +8,7 @@ Author: claude
 2026-04-24T00:00Z claude created — harness sweep found ~15 lines binding adherence ratchet to Python/pytest/uv
 2026-04-24T00:00Z claude note reimagine — Python binding is structural (45-50% of file, Phase 1.0 is 100% Python). No non-Python consumer exists yet. Full rewrite is YAGNI. Minimal fix: adapter paragraph stating "a project exposes any command emitting the verdict schema; Python projects fulfill this via pytest markers." ~5 lines, no new stack assumption, preserves all current behavior.
 2026-04-24T00:00Z claude note plan — leak-guard already passes (file uses "uv run python -m pytest" not "uv run pytest"). Insert ## Protocol section between ## Input and ## Phases. 5-sentence paragraph: names the contract, frames Python/pytest as the current binding, gives Go/LaTeX examples as illustration only. No removals, no escape hatches needed.
+2026-04-24T00:00Z claude status claimed
 
 --- body ---
 ## Context
