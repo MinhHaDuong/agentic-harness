@@ -81,3 +81,5 @@ Format:
 ```
 
 Omit a heading if it has no entries. If all checks are `ok`, omit the Action plan entirely.
+
+Once the Action plan is fully effected, propose: "Surface remaining nits?"
