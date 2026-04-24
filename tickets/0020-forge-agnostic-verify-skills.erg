@@ -1,6 +1,6 @@
 %erg v1
 Title: Make verify/verify-adherence/verify-gate forge-agnostic
-Status: in-progress
+Status: closed
 Created: 2026-04-24
 Author: claude
 
@@ -9,6 +9,7 @@ Author: claude
 2026-04-24T00:00Z claude note reimagine — simplest path: require branch-name input in both skills (drop PR-number resolution); CI-status check becomes best-effort with graceful skip; block-pr-merge-in-worktree.sh is out of scope (script, not skill). Three focused skill edits, zero new abstractions.
 2026-04-24T00:00Z claude note plan — verify/SKILL.md: drop escape-hatch comment on checkout (keep instruction), replace CI-status paragraph (best-effort/graceful skip, no "CI gap" comment). verify-adherence/SKILL.md: drop escape-hatch + MR-resolution sentence; argument-hint changes to <branch>. No caller changes needed (start-ticket already passes branch; orchestrator passes MR number to /verify which resolves internally).
 2026-04-24T00:00Z claude status claimed
+2026-04-24T10:05Z claude status closed — PR #57 merged (squash), all exit criteria met
 
 --- body ---
 ## Context

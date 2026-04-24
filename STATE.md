@@ -12,13 +12,9 @@ Level 4 (Hooks) + orchestrator + `/verify` loop + git-erg tickets + bibliography
 
 Field testing on a handful of projects: data analysis in Python and academic writing in LaTeX and QMD. Four projects have ticketed split-build work (Cadens 0022, Fuzzy Corpus 0023, AEDIST 0112, Climate Finance 0093).
 
-## Open tickets (5)
+## Open tickets (1)
 
 - 0013 — bib-to-zotero (push refs.bib to Zotero via API at submission)
-- 0018 — shell-pipefail-guard — **PR #56 open, approved**
-- 0020 — forge-agnostic verify skills — **PR #57 open, approved**
-- 0021 — verify-adherence stack-agnostic adapter — **PR #58 open, approved** (depends on #57)
-- 0022 — coding.md → coding-python.md scope guard — **PR #55 open, approved**
 
 ## Blockers
 
@@ -26,7 +22,6 @@ None
 
 ## Next actions
 
-- **Merge PRs**: #55, #56 independent; then #57, then #58 (depends on #57).
 - **doudou setup**: add source line to `~/.bashrc` after pulling harness.
 - **Project split-build tickets**: commit the four project-side `.erg` files and open PRs.
 - Build 0013 (bib-to-zotero) when a manuscript reaches submission.
