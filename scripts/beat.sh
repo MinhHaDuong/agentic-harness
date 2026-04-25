@@ -91,6 +91,28 @@ _on_sigterm() {
 }
 trap '_on_sigterm' TERM
 
+# Guard: SIGKILL recovery — if last record is in_progress and < 55 min old,
+# previous run was killed before it could write spin-down.
+if [[ -s "$PROJECT/beat-log.jsonl" ]]; then
+    _last=$(jq -s 'last' "$PROJECT/beat-log.jsonl")
+    _out=$(printf '%s' "$_last" | jq -r '.outcome // ""')
+    if [[ "$_out" == "in_progress" ]]; then
+        _last_at=$(printf '%s' "$_last" | jq -r '.last_run_at // "1970-01-01T00:00:00Z"')
+        _last_epoch=$(date -d "$_last_at" +%s 2>/dev/null || echo 0)
+        if (( $(date +%s) - _last_epoch < 3300 )); then
+            printf '%s\n' "$(jq -cn --arg t "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+                '{"last_run_at":$t,"ticket_id":null,"branch":null,"PR":null,
+                  "outcome":"aborted","diagnostics":"crash/SIGKILL recovery — previous run never completed spin-down"}')" \
+                >> "$PROJECT/beat-log.jsonl"
+            echo "=== $SKILL aborted: crash recovery $(date -u +%FT%TZ) ===" >&2
+            exit 0
+        fi
+    fi
+fi
+# Spin-in: launcher writes in_progress with a shell timestamp (not delegated to agent)
+printf '%s\n' "$(jq -cn --arg t "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+    '{"outcome":"in_progress","last_run_at":$t}')" >> "$PROJECT/beat-log.jsonl"
+
 # --permission-mode bypassPermissions  non-interactive unattended mode
 # --output-format stream-json          structured output; cost in .usage field
 # --no-session-persistence             no writes to harness session store
@@ -127,14 +149,24 @@ if [[ "$CLAUDE_RC" -eq 124 ]]; then
 elif [[ "$CLAUDE_RC" -ne 0 ]]; then
     echo "=== $SKILL claude exit rc=$CLAUDE_RC elapsed=${BEAT_ELAPSED}s $(date -u +%FT%TZ) ===" >&2
 else
-    # Clean exit: patch duration_s into the skill's spin-down record
+    # Clean exit: if agent wrote spin-down, patch duration_s; if not, write idle fallback.
     if [[ -s "$PROJECT/beat-log.jsonl" ]]; then
         last=$(tail -1 "$PROJECT/beat-log.jsonl")
-        patched=$(printf '%s' "$last" | jq --argjson d "$BEAT_ELAPSED" '. + {duration_s: $d}')
-        tmp=$(mktemp)
-        head -n -1 "$PROJECT/beat-log.jsonl" > "$tmp"
-        printf '%s\n' "$patched" >> "$tmp"
-        mv "$tmp" "$PROJECT/beat-log.jsonl"
+        last_outcome=$(printf '%s' "$last" | jq -r '.outcome // ""')
+        if [[ "$last_outcome" == "in_progress" ]]; then
+            printf '%s\n' "$(jq -cn \
+                --arg t "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+                --argjson d "$BEAT_ELAPSED" \
+                '{"last_run_at":$t,"ticket_id":null,"branch":null,"PR":null,
+                  "outcome":"idle","diagnostics":"no ticket picked","duration_s":$d}')" \
+                >> "$PROJECT/beat-log.jsonl"
+        else
+            patched=$(printf '%s' "$last" | jq --argjson d "$BEAT_ELAPSED" '. + {duration_s: $d}')
+            tmp=$(mktemp)
+            head -n -1 "$PROJECT/beat-log.jsonl" > "$tmp"
+            printf '%s\n' "$patched" >> "$tmp"
+            mv "$tmp" "$PROJECT/beat-log.jsonl"
+        fi
     fi
 fi
 

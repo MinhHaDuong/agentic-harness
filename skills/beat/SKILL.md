@@ -12,14 +12,9 @@ Your mindset is conservative: when in doubt, log the situation and stop rather t
 attempting risky changes. Do not commit directly — skills handle all commits.
 The amount of work expected is one beat, the elementary division of time in music -- a bite sized change, easy in 50 mn max.
 
-## Spin up (mandatory)
+## Spin up
 
-The log file is `beat-log.jsonl` in the project root — one JSON record per line, newest last.
-
-1. Read the last record of `beat-log.jsonl` (via `jq -s 'last'`). If file missing or empty, cold start.
-2. If that line has `outcome: in_progress` and `last_run_at` is less than 55 minutes ago,
-   go to **Spin down** with `outcome: aborted`, `diagnostics: "crash/SIGKILL recovery — previous run never completed spin-down"`, then stop.
-3. Mark active: append `{"outcome":"in_progress","last_run_at":"<now UTC ISO-8601Z>"}` to `beat-log.jsonl`.
+Read the last few entries of `beat-log.jsonl` (`jq -s '.[-4:]'`) and `STATE.md` to orient.
 
 ## Do the work
 
@@ -30,10 +25,11 @@ You have three skills on the happy sequence:
 
 ## Spin down (mandatory)
 
-Append one JSON record to `beat-log.jsonl`:
+Append one record to `beat-log.jsonl` before exiting — including after housekeeping-only runs
+(e.g. when /pick-ticket finds no ticket, write `"outcome":"idle"`):
 
 ```json
 {"last_run_at":"<UTC ISO-8601Z>","ticket_id":"<id or null>","branch":"<branch or null>","PR":"<PR# or null>","outcome":"idle|done|failed|blocked|escalated|aborted","diagnostics":"<one-line summary>"}
 ```
 
-`duration_s` (wall-clock seconds) is appended by the launcher after you exit — do not write it yourself.
+`duration_s` is patched in by the launcher after you exit — do not write it yourself.
