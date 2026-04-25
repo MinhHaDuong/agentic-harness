@@ -16,7 +16,8 @@
       "Bash(gh api *)",
       "Edit(/.claude/skills/start-ticket/**)",
       "Bash(uv sync *)",
-      "Bash(git merge *)"
+      "Bash(git merge *)",
+      "Bash(*ticket-wip*)"
     ]
   },
   "model": "sonnet",
