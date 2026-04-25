@@ -18,6 +18,9 @@ Attempt history is read directly from each ticket's `## Attempt log` section.
    - Tickets with status or tags: `needs-human`, `post-talk`, `post-conference`, `deferred`
    - Tickets whose `## Attempt log` contains a `FAILED` or `BLOCKED` entry
      dated within the last 24 hours
+   - Tickets whose description indicates a compute job, model run, or batch execution
+     (e.g. "run scripts on padme", "launch ablation", "rerun experiments") — these
+     require human setup or a long-running detached process that a beat cannot provide
 
 3. **3-strikes rule.** For any remaining ticket whose `## Attempt log` has
    3 or more entries: mark it `needs-human` in its front-matter, commit on
