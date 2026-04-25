@@ -15,10 +15,12 @@ The workflow is orient - work - report.
 
 1. Orient. Read `STATE.md` and the last few entries of `beat-log.jsonl` (`jq -s '.[-4:]'`).
 
-2. Work. You have three tools:
-- Optional /housekeeping. Invoke if STATE.md says its last run is more than 12 hours old.
-- /pick-ticket. If you do not get one, do not invent work, just report the null finding.
-- /orchestrator the ticket.
+2. Work — follow in order:
+   a. If STATE.md shows housekeeping last run > 12 h ago, invoke /housekeeping via the Skill tool.
+   b. Invoke /pick-ticket via the Skill tool. Read its output:
+      - `IDLE:` → skip to step 3, set outcome=idle.
+      - `PICK: <id>` → proceed to (c). Do not stop here.
+   c. Invoke /orchestrator with that ticket id via the Skill tool.
 
 3. Report. Before exiting append one record to `beat-log.jsonl` as: 
 ```json
