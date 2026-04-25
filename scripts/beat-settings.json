@@ -1,4 +1,14 @@
 {
+  "disabledTools": [
+    "AskUserQuestion",
+    "EnterPlanMode", "ExitPlanMode",
+    "ScheduleWakeup",
+    "CronCreate", "CronDelete", "CronList",
+    "RemoteTrigger",
+    "mcp__claude_ai_Gmail__*",
+    "mcp__claude_ai_Google_Calendar__*",
+    "mcp__claude_ai_Google_Drive__*"
+  ],
   "hooks": {
     "PreToolUse": [
       {
