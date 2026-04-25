@@ -26,7 +26,7 @@ None
 
 ## Next actions
 
-- Monitor first nightbeat runs tonight: `journalctl --user -u claude-nightbeat.service -f` and check per-project `beat-log.jsonl`
+- Monitor first nightbeat runs (firing hourly today, it's Saturday): `journalctl --user -u claude-nightbeat.service -f` and check per-project `beat-log.jsonl`
 - Watch `duration_s` in beat logs to see if 52-min cap is ever hit
 - **doudou setup**: add source line to `~/.bashrc` after pulling harness.
 - **Project split-build tickets**: commit the four project-side `.erg` files and open PRs.
