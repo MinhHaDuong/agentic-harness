@@ -20,6 +20,8 @@ if [[ -z "${CLAUDE_NIGHT_SWEEP:-}" ]]; then
     echo "Worktree isolation is enabled for this project. Every new conversation must start in its own worktree. Use EnterWorktree as your first action before responding to the user."
 fi
 
+echo "Running on host: $(hostname -s)"
+
 # Check for stale rules (advisory — prints warnings if any)
 _script_dir="$(cd "$(dirname "$0")" && pwd)"
 if [ -f "$_script_dir/warn-stale-rules.sh" ]; then

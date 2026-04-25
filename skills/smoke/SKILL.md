@@ -5,7 +5,7 @@ user-invocable: true
 argument-hint:
 ---
 
-You are the night-sweep agent running a startup self-check.
+You are the nightbeat agent running a startup self-check.
 
 Use Bash to answer items 1, 3, 4, and 6 — do not guess them.
 

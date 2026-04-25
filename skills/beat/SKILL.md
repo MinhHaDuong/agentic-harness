@@ -16,10 +16,9 @@ The amount of work expected is one beat, the elementary division of time in musi
 
 The log file is `beat-log.jsonl` in the project root — one JSON record per line, newest last.
 
-1. Read the last line of `beat-log.jsonl` (via `tail -1`). If file missing or empty, cold start.
+1. Read the last record of `beat-log.jsonl` (via `jq -s 'last'`). If file missing or empty, cold start.
 2. If that line has `outcome: in_progress` and `last_run_at` is less than 35 minutes ago,
-   append the aborted record (see Spin down schema) and stop.
-   Do NOT continue.
+   go to **Spin down** with `outcome: aborted`, `diagnostics: "previous run still in_progress"`, then stop.
 3. Mark active: append `{"outcome":"in_progress","last_run_at":"<now UTC ISO-8601Z>"}` to `beat-log.jsonl`.
 
 ## Do the work
@@ -34,12 +33,5 @@ You have three skills on the happy sequence:
 Append one JSON record to `beat-log.jsonl`:
 
 ```json
-{
-  "last_run_at": "<UTC ISO-8601Z>",
-  "ticket_id": "<id or null>",
-  "branch": "<branch or null>",
-  "PR": "<PR# or null>",
-  "outcome": "idle|done|failed|blocked|escalated|aborted",
-  "diagnostics": "<one-line summary>"
-}
+{"last_run_at":"<UTC ISO-8601Z>","ticket_id":"<id or null>","branch":"<branch or null>","PR":"<PR# or null>","outcome":"idle|done|failed|blocked|escalated|aborted","diagnostics":"<one-line summary>"}
 ```
