@@ -1,15 +1,15 @@
 ---
 name: beat
-description: Trigger one beat cycle — runs beat.py (housekeeping → pick-ticket → orchestrator) on the next project in rotation.
+description: Trigger one beat cycle on the current project (housekeeping → pick-ticket → orchestrator).
 user-invocable: true
 argument-hint:
 ---
 
-Run one beat cycle and report the outcome.
+Run one beat cycle on the current project and report the outcome.
 
 ```bash
-python3 ~/.claude/scripts/beat.py
+BEAT_PROJECT=$(pwd) python3 ~/.claude/scripts/beat.py
 ```
 
-When it finishes, read the last line of the relevant project's `beat-log.jsonl`
+When it finishes, read the last line of `beat-log.jsonl` in the current project
 and report: project, ticket_id, outcome, duration_s.

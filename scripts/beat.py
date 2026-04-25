@@ -332,10 +332,17 @@ def _setup_env() -> None:
 
 
 def _pick_project() -> tuple[int, Path]:
-    """Return (run_count, project) using sequential rotation counter."""
+    """Return (run_count, project).
+
+    If BEAT_PROJECT is set, use that path directly (counter still advances).
+    Otherwise use sequential rotation across PROJECTS.
+    """
     count = int(COUNTER_FILE.read_text().strip()) if COUNTER_FILE.exists() else 0
-    idx = count % len(PROJECTS)
     COUNTER_FILE.write_text(str(count + 1))
+    override = os.environ.get("BEAT_PROJECT")
+    if override:
+        return count, Path(override).resolve()
+    idx = count % len(PROJECTS)
     return count, PROJECTS[idx]
 
 
