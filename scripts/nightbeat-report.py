@@ -263,7 +263,8 @@ def _beat_log_night_summary(proj: Path, since: datetime) -> dict:
         last = rec
         if rec.get("last_run_at", "") >= since_str:
             outcome = rec.get("outcome", "?")
-            counts[outcome] = counts.get(outcome, 0) + 1
+            if outcome != "in_progress":  # orphans cleaned by beat.py; skip noise
+                counts[outcome] = counts.get(outcome, 0) + 1
     return {"counts": counts, "last": last}
 
 
@@ -436,7 +437,7 @@ def main() -> None:
         if not counts and not last:
             continue
         parts_p: list[str] = []
-        for outcome in ("done", "idle", "failed", "aborted", "in_progress"):
+        for outcome in ("done", "idle", "failed", "aborted"):
             if counts.get(outcome):
                 parts_p.append(f"{outcome}:{counts[outcome]}")
         last_ticket = last.get("ticket_id") or "—"

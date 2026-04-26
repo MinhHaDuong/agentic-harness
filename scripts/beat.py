@@ -53,7 +53,7 @@ CRASH_RECOVERY_WINDOW_S: int = 55 * 60
 LOG_RETAIN_COUNT: int = 60
 TIMEOUT_EXIT_CODE: int = 124  # matches bash `timeout` convention
 
-BUDGET_HOUSEKEEPING: float = 0.25
+BUDGET_HOUSEKEEPING: float = 0.35
 BUDGET_PICK_TICKET: float = 0.50
 BUDGET_ORCHESTRATOR: float = 5.00
 
@@ -99,6 +99,45 @@ def _log(msg: str) -> None:
 
 def _beat_log_path(project: Path) -> Path:
     return project / "beat-log.jsonl"
+
+
+def _cleanup_stale_in_progress(project: Path) -> None:
+    """Rewrite any in_progress record older than CRASH_RECOVERY_WINDOW_S to aborted.
+
+    Crash recovery only catches the most-recent record; this catches orphans
+    buried under subsequent done/failed records when the 55-min window elapsed
+    before the project was next visited.
+    """
+    path = _beat_log_path(project)
+    if not path.exists():
+        return
+    cutoff = time.time() - CRASH_RECOVERY_WINDOW_S
+    lines = path.read_text().splitlines()
+    changed = False
+    new_lines: list[str] = []
+    for line in lines:
+        if line.strip():
+            try:
+                rec = json.loads(line)
+                if rec.get("outcome") == "in_progress":
+                    epoch = datetime.fromisoformat(
+                        rec.get("last_run_at", "1970-01-01T00:00:00Z").replace(
+                            "Z", "+00:00"
+                        )
+                    ).timestamp()
+                    if epoch < cutoff:
+                        rec["outcome"] = "aborted"
+                        rec["diagnostics"] = (
+                            "stale in_progress — cleaned on next beat start"
+                        )
+                        line = json.dumps(rec, separators=(",", ":"))
+                        changed = True
+            except (json.JSONDecodeError, ValueError, TypeError):
+                pass
+        new_lines.append(line)
+    if changed:
+        path.write_text("\n".join(new_lines) + "\n")
+        _log(f"=== startup: cleaned stale in_progress records in {project.name} ===")
 
 
 def append_beat_log(project: Path, record: dict) -> None:
@@ -463,6 +502,10 @@ def main() -> None:
         sys.exit(1)
 
     (project / ".claude" / "sweep-state").mkdir(parents=True, exist_ok=True)
+
+    # Layer-1 cleanup: rewrite buried stale in_progress records that crash
+    # recovery missed (it only checks the most-recent record within 55 min).
+    _cleanup_stale_in_progress(project)
 
     # Crash / SIGKILL recovery
     last = read_last_beat_record(project)
