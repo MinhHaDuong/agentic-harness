@@ -72,6 +72,18 @@ full assessment below.
       with no external dependencies
    3. If risk is equal, prefer the simpler one
 
+   After ranking, **write a log line into every candidate** (both the winner
+   and runners-up). Use verb `note` with token `sweep-assess:`:
+
+   Runner-up (not selected):
+   `{ISO8601} claude note sweep-assess: candidate; not picked — {one-line reason}`
+
+   Winner:
+   `{ISO8601} claude note sweep-pick: selected — {one-line reason}`
+
+   Commit all log writes (winners + runners-up + any sweep-skip lines from
+   steps 2–3) in a single commit on the default branch before emitting output.
+
 5. If the candidate set is empty, output `IDLE: no eligible tickets` and stop.
 
 ## Output
