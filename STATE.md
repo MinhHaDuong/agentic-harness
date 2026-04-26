@@ -1,6 +1,6 @@
 # Imperial Dragon Harness — State
 
-Last updated: 2026-04-25 (beat.py — per-project lock + erg hooks)
+Last updated: 2026-04-26 (nightbeat-report, beat fixes)
 
 ## North star
 
@@ -12,7 +12,9 @@ Level 4 (Hooks) + orchestrator + `/verify` loop + git-erg tickets + bibliography
 
 **Forge-agnostic**: leak-guard enforces no `gh`/`github.com` in skills. Coding rules (coding-python.md) loaded conditionally for Python projects only.
 
-**Nightbeat** (`claude-nightbeat.timer`) live on padme. Fires hourly 22:00–06:00 weeknights, all day weekends. `beat.py` hardcodes control flow (pick→orchestrate) in Python — no LLM orchestrator. Per-project lock (`nightbeat-{name}.lock` under `$XDG_RUNTIME_DIR`) allows concurrent beats on different projects. `project_scoped=True` on pick-ticket/orchestrator prevents cross-project ticket leakage. 60 pytest tests, ruff-clean.
+**Nightbeat** (`claude-nightbeat.timer`) live on padme. Fires hourly 22:00–06:00 weeknights, all day weekends. `beat.py` hardcodes control flow (pick→orchestrate) in Python — no LLM orchestrator. Per-project lock allows concurrent beats on different projects. `project_scoped=True` on pick-ticket/orchestrator prevents cross-project ticket leakage. Orchestrator can now push branches and open PRs (push guard removed from `beat-settings.json`). Housekeeping budget raised to $0.35. `_cleanup_stale_in_progress()` runs at beat startup to rewrite buried orphan records. 60 pytest tests, ruff-clean.
+
+**Morning review**: `/nightbeat-report` skill runs `scripts/nightbeat-report.py`, narrates completed work, lists branches to push, and surfaces harness friction patterns.
 
 **git-erg**: pre-commit hooks installed in all four projects (aedist-technical-report, cadens, Climate_finance, fuzzy-corpus). `erg` binary present in all four.
 
@@ -26,12 +28,14 @@ None
 
 ## Next actions
 
-- Monitor nightbeat runs: `journalctl --user -u claude-nightbeat.service -f` and per-project `beat-log.jsonl`
+- Morning review: `/nightbeat-report` — runs the parser and narrates overnight work
 - **doudou setup**: add source line to `~/.bashrc`, install nightbeat systemd units, copy erg binary to all projects
+- Implement ticket 0027 (pick-ticket incremental assessment + `sweep-skip` verb) — annotated with post-talk case
 - Build 0013 (bib-to-zotero) when a manuscript reaches submission
 
 ## Backlog
 
+- When beat do nothing, immediately redo with next project
 - Streamline settings.json hook configuration
 - Actually make use of the built-in self-monitoring
 - Merge REALF guidelines and business rules
