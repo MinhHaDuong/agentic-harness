@@ -404,15 +404,22 @@ func detectCycles(tickets []Erg) []string {
 	return errors
 }
 
-func validateAll(tickets []Erg, extraIDs map[string]bool) []string {
+// validateAll validates a set of tickets.
+// subset: the tickets to run per-ticket rules on (the explicitly requested files).
+// fullContext: the full directory contents used for Rule 7 (duplicates), Rule 8
+// (ref existence), and Rule 9 (cycle detection). When called with a directory
+// arg, subset == fullContext. When called with file args, fullContext is the
+// parent dir load and subset is only the passed files.
+// extraIDs: archived ticket IDs (valid Blocked-by targets, collision source).
+func validateAll(subset []Erg, fullContext []Erg, extraIDs map[string]bool) []string {
 	var errors []string
 
-	// Rule 7: no duplicate IDs
+	// Rule 7: no duplicate IDs — run over fullContext
 	idToFiles := make(map[string][]string)
-	for i := range tickets {
-		id := tickets[i].FilenameID()
+	for i := range fullContext {
+		id := fullContext[i].FilenameID()
 		if id != "" {
-			idToFiles[id] = append(idToFiles[id], tickets[i].Filename())
+			idToFiles[id] = append(idToFiles[id], fullContext[i].Filename())
 		}
 	}
 
@@ -425,7 +432,7 @@ func validateAll(tickets []Erg, extraIDs map[string]bool) []string {
 		}
 	}
 
-	// Check collisions with archived ticket IDs
+	// Check collisions with archived ticket IDs (using fullContext IDs)
 	if extraIDs != nil {
 		for tid := range idToFiles {
 			if extraIDs[tid] {
@@ -436,7 +443,7 @@ func validateAll(tickets []Erg, extraIDs map[string]bool) []string {
 		}
 	}
 
-	// Build allIDs for reference checking
+	// Build allIDs for reference checking — from fullContext + extraIDs
 	allIDs := make(map[string]bool)
 	for id := range idToFiles {
 		allIDs[id] = true
@@ -445,13 +452,13 @@ func validateAll(tickets []Erg, extraIDs map[string]bool) []string {
 		allIDs[id] = true
 	}
 
-	// Per-ticket validation
-	for i := range tickets {
-		errors = append(errors, validateErg(&tickets[i], allIDs)...)
+	// Per-ticket validation — iterate subset only
+	for i := range subset {
+		errors = append(errors, validateErg(&subset[i], allIDs)...)
 	}
 
-	// Rule 9: dependency cycles
-	errors = append(errors, detectCycles(tickets)...)
+	// Rule 9: dependency cycles — run over fullContext
+	errors = append(errors, detectCycles(fullContext)...)
 	return errors
 }
 
@@ -460,7 +467,12 @@ func cmdValidate(args []string) int {
 		args = []string{"tickets/"}
 	}
 
-	var tickets []Erg
+	// Pass 1: collect context dirs and subset (explicitly passed) files.
+	// For a directory arg: it is both a context dir and its tickets are the subset.
+	// For a file arg: the file is the subset, its parent dir is the context dir.
+	contextDirs := make(map[string]bool) // cleaned dir paths, deduped
+	var subsetTickets []Erg
+
 	for _, arg := range args {
 		info, err := os.Stat(arg)
 		if err != nil {
@@ -468,27 +480,52 @@ func cmdValidate(args []string) int {
 			continue
 		}
 		if info.IsDir() {
-			tickets = append(tickets, loadErgs(arg)...)
+			dir := filepath.Clean(arg)
+			contextDirs[dir] = true
+			subsetTickets = append(subsetTickets, loadErgs(arg)...)
 		} else if strings.HasSuffix(arg, ".erg") {
-			tickets = append(tickets, parseErg(arg))
+			dir := filepath.Clean(filepath.Dir(arg))
+			contextDirs[dir] = true
+			subsetTickets = append(subsetTickets, parseErg(arg))
 		} else {
 			fmt.Printf("WARNING: skipping %s (not a .erg file or directory)\n", arg)
 		}
 	}
 
-	if len(tickets) == 0 {
+	if len(subsetTickets) == 0 {
 		fmt.Println("No .erg files found.")
 		return 0
 	}
 
-	// Load archived ticket IDs as valid Blocked-by targets
-	extraIDs := make(map[string]bool)
-	for _, arg := range args {
-		info, err := os.Stat(arg)
-		if err != nil || !info.IsDir() {
-			continue
+	// Pass 2: load full context from each context dir.
+	// Build a set of subset paths to avoid double-counting per-ticket rules,
+	// but fullContext includes everything for Rule 7/8/9.
+	subsetPaths := make(map[string]bool)
+	for i := range subsetTickets {
+		subsetPaths[filepath.Clean(subsetTickets[i].Path)] = true
+	}
+
+	var contextTickets []Erg
+	seenContextPaths := make(map[string]bool)
+	for dir := range contextDirs {
+		for _, t := range loadErgs(dir) {
+			cleanPath := filepath.Clean(t.Path)
+			if seenContextPaths[cleanPath] {
+				continue
+			}
+			seenContextPaths[cleanPath] = true
+			contextTickets = append(contextTickets, t)
 		}
-		archiveDir := filepath.Join(arg, "archive")
+	}
+	sort.Slice(contextTickets, func(i, j int) bool {
+		return contextTickets[i].Filename() < contextTickets[j].Filename()
+	})
+
+	// Load archived ticket IDs as valid Blocked-by targets.
+	// Fire for every context dir (covers both dir args and parent dirs of file args).
+	extraIDs := make(map[string]bool)
+	for dir := range contextDirs {
+		archiveDir := filepath.Join(dir, "archive")
 		if info, err := os.Stat(archiveDir); err == nil && info.IsDir() {
 			for _, at := range loadErgs(archiveDir) {
 				id := at.FilenameID()
@@ -499,7 +536,7 @@ func cmdValidate(args []string) int {
 		}
 	}
 
-	errors := validateAll(tickets, extraIDs)
+	errors := validateAll(subsetTickets, contextTickets, extraIDs)
 	if len(errors) > 0 {
 		fmt.Printf("ERG VALIDATION FAILED (%d error(s)):\n", len(errors))
 		for _, e := range errors {
@@ -508,7 +545,7 @@ func cmdValidate(args []string) int {
 		return 1
 	}
 
-	fmt.Printf("ERG VALIDATION: PASS (%d tickets)\n", len(tickets))
+	fmt.Printf("ERG VALIDATION: PASS (%d tickets)\n", len(subsetTickets))
 	return 0
 }
 
