@@ -6,6 +6,7 @@ Author: claude
 
 --- log ---
 2026-04-26T00:00Z claude created
+2026-04-26T09:00Z claude note case: aedist/0075 post-talk leak — ticket marked "post-talk" in STATE.md but pick-ticket has no concept of deferral; selected 3 consecutive beats ($4.08) before a human answered the gate question. The sweep-skip mechanism in this ticket is the right fix: orchestrator appends `sweep-skip: defer-until-{date}` (or `defer-until-human`) after hitting the gate, pick-ticket reads it and fast-paths past the ticket until the date or until the body changes. Without this, any ticket that requires a human decision before Execute stalls every beat on that project.
 
 --- body ---
 ## Context
