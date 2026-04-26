@@ -6,6 +6,7 @@ Author: claude
 
 --- log ---
 2026-04-25T20:50Z claude created
+2026-04-26T15:30Z claude note reimagined: not ripe — no current ticket is blocked by missing hostname; defer until doudou multi-host setup. Drop action 3 (stale --data-dir paths, separate concern). Remove option (c) from choices. Exit criteria need a test fixture since no hostname-gated ticket exists today.
 
 --- body ---
 ## Context

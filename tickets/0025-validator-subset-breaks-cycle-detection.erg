@@ -6,6 +6,7 @@ Author: claude
 
 --- log ---
 2026-04-26T00:00Z claude created
+2026-04-26T15:30Z claude note reimagined: ripe, bug confirmed at main.go:472-473 (no sibling loading), 486-489 (archive skip for file args), 440-446 (allIDs from loaded only), 340-355 (DFS over passed slice only). Drop action 2 (--subset flag). Key risk: dedup — passed file appears in both explicit list and parent-dir load, causing false Rule 7 duplicate-ID error. Fix needs split like validateAll(subset, fullContext, extraIDs). Test infrastructure (t.TempDir() fixtures) required; no cmdValidate-level tests exist yet.
 
 --- body ---
 ## Context
