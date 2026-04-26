@@ -1,0 +1,76 @@
+%erg v1
+Title: Build multiproject beat dashboard (git+ticket activity view)
+Status: open
+Created: 2026-04-26
+Author: claude
+
+--- log ---
+2026-04-26T09:00Z claude created
+
+--- body ---
+## Context
+
+PR 61 prototype (`bin/beat-dashboard`) showed a working hourly disc grid + ticket queue panel
+(stdlib-only, 496 lines). The prototype has two weaknesses:
+
+1. Beat-log is not the primary activity signal — most work runs through the orchestrator skill
+   in interactive sessions. Git commits and ticket status changes capture all modes.
+2. Cost tracking (cost_usd) is irrelevant — user is on a Claude plan; dollars don't count,
+   tokens/plan limits do.
+
+This ticket builds a revised, three-view dashboard on top of the prototype.
+
+## Actions
+
+### View 1 — Overview (extend prototype)
+- Drop cost column
+- Add **Commits today** column: `git log --since=midnight --oneline | wc -l` per project
+- Add **Ticket velocity** column: tickets closed this week vs. last week (from .erg Created/status)
+- Add **Health pill**: green = any done beat in last 24 h, amber = only idle, red = failed/aborted
+- Beat disc grid becomes collapsible secondary panel (default collapsed)
+- Window selector extends to 168 h; at >48 h collapse to day-granularity with sparkline cells
+
+### View 2 — Project drill-down (`/project/<name>`)
+- Beat log table: time, outcome, ticket, duration, diagnostics; expandable raw JSON row
+- Ticket list: full status, title, age, blocker chain; sorted by readiness tier then age
+- STATE.md snippet: last-updated date + "Status" section as plain text
+- Back link to overview
+
+### View 3 — Blocker graph (`/blockers`)
+- Cross-project SVG DAG of tickets that block other tickets
+- Nodes coloured by readiness (green=ready, blue=doing, orange=blocked, grey=pending)
+- Edges show dependency direction
+- Surfaces "keystone" tickets blocking multiple chains across projects
+
+### Infrastructure
+- Single `bin/beat-dashboard` file, stdlib only (no external dependencies)
+- Serve all three views from one HTTPServer subclass
+- Auto-refresh 60 s (meta-refresh, no WebSocket)
+- Projects parsed from `~/.claude/scripts/beat.sh` or `--projects PATH:PATH:...`
+
+## Test
+
+```bash
+# Red step: verify View 2 route exists and returns 200
+python - <<'EOF'
+import urllib.request, subprocess, time, signal, os, sys
+srv = subprocess.Popen(["python", "bin/beat-dashboard", "--no-browser",
+                        "--projects", os.path.expanduser("~/.claude")])
+time.sleep(1)
+try:
+    code = urllib.request.urlopen("http://127.0.0.1:8765/project/.claude").getcode()
+    assert code == 200, f"got {code}"
+    print("PASS")
+finally:
+    srv.send_signal(signal.SIGINT)
+EOF
+```
+
+## Exit criteria
+
+- `bash -n bin/beat-dashboard` passes (syntax clean)
+- Overview loads with commits-today and ticket-velocity columns visible
+- Clicking a project row navigates to `/project/<name>` drill-down
+- `/blockers` renders an SVG with at least one node when any ticket has a Blocked-by header
+- No external imports (stdlib only); `ruff check bin/beat-dashboard` clean
+- Auto-refresh header present in HTML (`<meta http-equiv="refresh" content="60">`)
