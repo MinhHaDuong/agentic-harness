@@ -6,6 +6,7 @@ Author: claude
 
 --- log ---
 2026-04-26T00:00Z claude created
+2026-04-26T15:35Z claude note planned: replace lines 107-111 of orchestrator/SKILL.md with CLEAN/TICKETED/ESCALATE outcomes; PR body field "Scope overflow: #NNNN"; explicit "Never rebase or amend"; ESCALATE trigger = uncertainty (no orthogonality test needed)
 2026-04-26T15:30Z claude note reimagined: ripe, pure doc change. Simplify: (1) Action 2 ESCALATE is misplaced — REROLL/APPROVED/ESCALATE are Phase 6 gate verdicts, not Phase 7; Phase 7 needs its own outcome vocab (CLEAN/TICKETED/ESCALATE). (2) Drop orthogonality-test Exception or simplify to "escalate if uncertain" — the detection logic is more complex than its value. (3) Replace "Scope note" with a plainer convention.
 
 --- body ---

@@ -7,6 +7,7 @@ Author: claude
 --- log ---
 2026-04-26T00:00Z claude created
 2026-04-26T09:00Z claude note case: aedist/0075 post-talk leak — ticket marked "post-talk" in STATE.md but pick-ticket has no concept of deferral; selected 3 consecutive beats ($4.08) before a human answered the gate question. The sweep-skip mechanism in this ticket is the right fix: orchestrator appends `sweep-skip: defer-until-{date}` (or `defer-until-human`) after hitting the gate, pick-ticket reads it and fast-paths past the ticket until the date or until the body changes. Without this, any ticket that requires a human decision before Execute stalls every beat on that project.
+2026-04-26T15:35Z claude note planned: insert Step 1.5 "Fast-path via sweep-skip cache" in pick-ticket SKILL.md between current Steps 1 and 2; check most-recent sweep-skip note in --- log --- for expires+hash match; write sweep-skip at each exclusion site with TTL; format: `{ts} claude note sweep-skip: {reason} expires:{ISO8601} hash:{12hex}`; body hash = SHA-256 of --- body --- section, first 12 hex chars; no FORMAT.md change; defer-until-human = no expires token
 2026-04-26T15:30Z claude note reimagined: ripe. Logic belongs in pick-ticket skill (not beat.py) — the skill already reads tickets and applies exclusion rules; sweep-skip is a natural extension. Use existing `note` verb, no FORMAT.md change. Embed body hash in the sweep-skip line for cheap change detection. Convention: `note sweep-skip: {reason} expires:{ISO8601}` or no expiry for defer-until-human. Document convention in the skill itself.
 
 --- body ---
