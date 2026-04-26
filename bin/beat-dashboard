@@ -1,0 +1,496 @@
+#!/usr/bin/env python3
+"""Beat dashboard — HTTP server showing nightbeat grid + ticket queue.
+
+Rows = projects, columns = hours (configurable window).
+Each disc: outcome colour + ticket ID (struck-through if now closed).
+Future panel: open tickets ranked by readiness (starvation / blocker view).
+
+Usage:
+    beat-dashboard [--port PORT] [--hours N] [--projects PATH:PATH:...]
+                   [--no-browser]
+
+Defaults: port 8765, hours 24, projects parsed from ~/.claude/scripts/beat.sh.
+"""
+
+import argparse
+import http.server
+import json
+import os
+import re
+import sys
+import webbrowser
+from datetime import datetime, timezone, timedelta
+from pathlib import Path
+from urllib.parse import parse_qs, urlparse
+
+HARNESS = Path.home() / ".claude"
+BEAT_SH = HARNESS / "scripts" / "beat.sh"
+
+# Outcome → (background, text)
+OUTCOME_STYLE = {
+    "done":        ("#22c55e", "#fff"),
+    "idle":        ("#475569", "#cbd5e1"),
+    "aborted":     ("#f97316", "#fff"),
+    "failed":      ("#ef4444", "#fff"),
+    "blocked":     ("#ca8a04", "#000"),
+    "escalated":   ("#a855f7", "#fff"),
+    "in_progress": ("#3b82f6", "#fff"),
+}
+
+READINESS_ORDER = {"ready": 0, "doing": 1, "pending": 2, "blocked": 3}
+STALE_DAYS = 14
+
+
+# ── Data loading ──────────────────────────────────────────────────────────────
+
+def parse_projects(arg: str) -> list[Path]:
+    if arg:
+        return [Path(p) for p in arg.split(":") if p]
+    if not BEAT_SH.exists():
+        return []
+    text = BEAT_SH.read_text()
+    m = re.search(r'PROJECTS=\(\s*(.*?)\s*\)', text, re.DOTALL)
+    if not m:
+        return []
+    home = str(Path.home())
+    paths = re.findall(r'"([^"]+)"', m.group(1))
+    result = []
+    for p in paths:
+        p = p.replace("$HOME", home).replace("${HOME}", home)
+        p = re.sub(r'\$\{?PROJECTS_ROOT\}?', home, p)
+        result.append(Path(p))
+    return result
+
+
+def load_beat_log(project: Path) -> list[dict]:
+    log = project / "beat-log.jsonl"
+    if not log.exists():
+        return []
+    records = []
+    for line in log.read_text().splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            records.append(json.loads(line))
+        except json.JSONDecodeError:
+            pass
+    return records
+
+
+def parse_erg(path: Path) -> dict | None:
+    try:
+        text = path.read_text()
+    except OSError:
+        return None
+    lines = text.splitlines()
+    if not lines or lines[0].strip() != "%erg v1":
+        return None
+    m = re.match(r'^(\d{4})-', path.name)
+    if not m:
+        return None
+    ticket_id = m.group(1)
+    headers: dict[str, str] = {}
+    blocked_by: list[str] = []
+    for line in lines[1:]:
+        if not line.strip() or line.startswith("---"):
+            break
+        hm = re.match(r'^([\w-]+):\s*(.*)', line)
+        if hm:
+            key = hm.group(1).lower()
+            val = hm.group(2).strip()
+            if key == "blocked-by":
+                blocked_by.append(val)
+            else:
+                headers[key] = val
+    return {
+        "id": ticket_id,
+        "title": headers.get("title", ""),
+        "status": headers.get("status", "open"),
+        "created": headers.get("created", ""),
+        "blocked_by": blocked_by,
+    }
+
+
+def load_tickets(project: Path) -> dict[str, dict]:
+    tickets: dict[str, dict] = {}
+    for d in [project / "tickets", project / "tickets" / "archive"]:
+        if not d.is_dir():
+            continue
+        for path in d.glob("*.erg"):
+            t = parse_erg(path)
+            if t:
+                tickets[t["id"]] = t
+    return tickets
+
+
+def has_wip(project: Path, ticket_id: str) -> bool:
+    return (project / ".git" / "ticket-wip" / f"{ticket_id}.wip").exists()
+
+
+def ticket_readiness(t: dict, all_tickets: dict, project: Path) -> tuple[str, list[str]]:
+    status = t["status"]
+    if status == "doing" or has_wip(project, t["id"]):
+        return "doing", []
+    if status == "pending":
+        return "pending", []
+    if status != "open":
+        return "other", []
+    unresolved = [
+        ref for ref in t["blocked_by"]
+        if not ref.startswith("gh#") and
+           (ref not in all_tickets or all_tickets[ref]["status"] != "closed")
+    ]
+    return ("blocked", unresolved) if unresolved else ("ready", [])
+
+
+def blocker_chain(ticket_id: str, all_tickets: dict, depth: int = 0) -> str:
+    """Return ' ← 0031 ← 0019' chain string, max 3 hops."""
+    if depth >= 3 or ticket_id not in all_tickets:
+        return ""
+    t = all_tickets[ticket_id]
+    unresolved = [
+        ref for ref in t["blocked_by"]
+        if not ref.startswith("gh#") and
+           (ref not in all_tickets or all_tickets[ref]["status"] != "closed")
+    ]
+    if not unresolved:
+        return ""
+    ref = unresolved[0]
+    return f" ← {ref}" + blocker_chain(ref, all_tickets, depth + 1)
+
+
+# ── HTML rendering ────────────────────────────────────────────────────────────
+
+def esc(s: str) -> str:
+    return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;")
+
+
+CSS = """
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+    font-family: system-ui, -apple-system, sans-serif;
+    font-size: 13px;
+    background: #0f172a;
+    color: #e2e8f0;
+    padding: 20px;
+}
+h1 { font-size: 14px; font-weight: 600; color: #64748b; margin-bottom: 10px; }
+.controls {
+    display: flex; align-items: center; gap: 12px;
+    font-size: 11px; color: #475569; margin-bottom: 18px;
+}
+.controls input[type=number] {
+    width: 52px; background: #1e293b; border: 1px solid #334155;
+    color: #e2e8f0; border-radius: 4px; padding: 2px 6px; font-size: 11px;
+}
+.controls button {
+    background: #1e3a5f; color: #93c5fd; border: 1px solid #1d4ed8;
+    border-radius: 4px; padding: 2px 8px; cursor: pointer; font-size: 11px;
+}
+.controls .ts { color: #334155; }
+
+table { border-collapse: separate; border-spacing: 0; width: 100%; }
+th {
+    font-size: 9px; font-weight: 500; color: #475569;
+    padding: 3px 2px; text-align: center;
+    border-bottom: 1px solid #1e293b;
+    position: sticky; top: 0; background: #0f172a; z-index: 1;
+}
+th.h-repo { text-align: left; padding-left: 0; min-width: 100px; }
+th.h-future { text-align: left; padding-left: 10px; min-width: 180px; }
+td { padding: 5px 2px; vertical-align: middle; }
+td.t-repo {
+    font-size: 11px; font-weight: 600; color: #94a3b8;
+    padding-right: 8px; white-space: nowrap;
+    border-bottom: 1px solid #1e293b;
+}
+td.t-disc { text-align: center; border-bottom: 1px solid #1e293b; }
+td.t-future { padding-left: 10px; border-bottom: 1px solid #1e293b; }
+
+.disc {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 36px; height: 36px; border-radius: 50%;
+    font-size: 8px; font-weight: 700; letter-spacing: -0.5px;
+    cursor: default;
+}
+.disc.empty {
+    background: transparent;
+    border: 1px dashed #1e293b;
+    color: #1e293b;
+}
+.s { text-decoration: line-through; opacity: 0.65; }
+
+@keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:.55; } }
+.disc.in-progress { animation: pulse 1.4s ease-in-out infinite; }
+
+.queue { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; padding: 2px 0; }
+.tag {
+    display: inline-flex; align-items: center; gap: 2px;
+    font-size: 10px; font-weight: 600;
+    padding: 2px 7px; border-radius: 10px;
+    white-space: nowrap; cursor: default;
+}
+.tag.ready   { background: #14532d; color: #86efac; border: 1px solid #166534; }
+.tag.doing   { background: #1e3a5f; color: #93c5fd; border: 1px solid #1d4ed8; }
+.tag.blocked { background: #431407; color: #fdba74; border: 1px solid #9a3412; }
+.tag.pending { background: #1c1917; color: #78716c; border: 1px solid #44403c; }
+.chain { font-size: 8px; opacity: 0.7; font-weight: 400; }
+.stale { box-shadow: 0 0 0 2px #ef4444; }
+
+.legend {
+    margin-top: 14px; font-size: 10px; color: #334155;
+    display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+}
+.swatch {
+    display: inline-block; width: 10px; height: 10px;
+    border-radius: 50%; vertical-align: middle; margin-right: 3px;
+}
+"""
+
+LEGEND_OUTCOMES = [
+    ("done", "done"), ("idle", "idle"), ("aborted", "aborted"),
+    ("failed", "failed"), ("blocked", "beat-blocked"), ("escalated", "escalated"),
+    ("in_progress", "in-progress"),
+]
+
+
+def disc_html(rec: dict | None, tickets: dict[str, dict]) -> str:
+    if rec is None:
+        return '<div class="disc empty" title="no beat">·</div>'
+
+    outcome = rec.get("outcome", "")
+    tid = rec.get("ticket_id")
+    diag = rec.get("diagnostics", "")
+    dur = rec.get("duration_s")
+    ts = rec.get("last_run_at", "")[:16]
+
+    parts = [outcome]
+    if diag:
+        parts.append(diag)
+    if dur is not None:
+        parts.append(f"{dur}s")
+    if tid:
+        parts.append(f"ticket {tid}")
+    if ts:
+        parts.append(ts)
+    tip = " · ".join(parts)
+
+    bg, fg = OUTCOME_STYLE.get(outcome, ("#1e293b", "#64748b"))
+    pulse = " in-progress" if outcome == "in_progress" else ""
+
+    if tid:
+        closed = tickets.get(tid, {}).get("status") == "closed"
+        id_html = f'<span class="{"s" if closed else ""}">{esc(tid)}</span>'
+    else:
+        id_html = '<span style="opacity:.3">·</span>'
+
+    return (
+        f'<div class="disc{pulse}" title="{esc(tip)}" '
+        f'style="background:{bg};color:{fg}">{id_html}</div>'
+    )
+
+
+def queue_html(queue: list) -> str:
+    if not queue:
+        return '<span style="color:#1e293b;font-size:10px">—</span>'
+    tags = []
+    for readiness, age, t, blockers, all_tickets in queue:
+        tid = t["id"]
+        title = t["title"]
+        age_str = f"{age}d" if age > 0 else "new"
+        tip = f"{esc(title[:60])} ({age_str})"
+        stale = " stale" if readiness == "ready" and age >= STALE_DAYS else ""
+        chain = ""
+        if readiness == "blocked" and blockers:
+            chain_str = blocker_chain(blockers[0], all_tickets)
+            chain = f'<span class="chain"> ← {esc(blockers[0])}{esc(chain_str)}</span>'
+        tags.append(
+            f'<span class="tag {readiness}{stale}" title="{tip}">'
+            f'{esc(tid)}{chain}</span>'
+        )
+    return '<div class="queue">' + "".join(tags) + "</div>"
+
+
+def build_html(projects: list[Path], hours: int) -> str:
+    now = datetime.now(timezone.utc)
+
+    # Build N hour slots: [now - N*h, now - (N-1)*h), ..., [now - 1h, now)
+    slots: list[datetime] = [now - timedelta(hours=hours - i) for i in range(hours)]
+
+    rows_html_parts = []
+    for project in projects:
+        name = project.name
+        records = load_beat_log(project)
+        tickets = load_tickets(project)
+
+        # Bucket records: for each slot [slot, slot+1h), take the last record
+        slot_records: list[dict | None] = []
+        slot_end_offset = timedelta(hours=1)
+        for slot_start in slots:
+            slot_end = slot_start + slot_end_offset
+            best = None
+            for rec in records:
+                ts_str = rec.get("last_run_at", "")
+                if not ts_str:
+                    continue
+                try:
+                    ts = datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
+                except ValueError:
+                    continue
+                if slot_start <= ts < slot_end:
+                    best = rec  # records are oldest-first; last one wins
+            slot_records.append(best)
+
+        # Future queue: open/doing/pending tickets
+        queue_items = []
+        for t in tickets.values():
+            if t["status"] not in ("open", "doing", "pending"):
+                continue
+            readiness, blockers = ticket_readiness(t, tickets, project)
+            if readiness == "other":
+                continue
+            try:
+                created = datetime.fromisoformat(t["created"])
+                age = (now.date() - created.date()).days
+            except (ValueError, AttributeError):
+                age = 0
+            queue_items.append((readiness, age, t, blockers, tickets))
+
+        # Sort: by readiness tier, then within ready/blocked oldest first (starvation risk)
+        queue_items.sort(key=lambda x: (READINESS_ORDER.get(x[0], 9), -x[1]))
+
+        discs = "".join(
+            f'<td class="t-disc">{disc_html(rec, tickets)}</td>'
+            for rec in slot_records
+        )
+        rows_html_parts.append(
+            f"<tr>"
+            f'<td class="t-repo">{esc(name)}</td>'
+            f"{discs}"
+            f'<td class="t-future">{queue_html(queue_items)}</td>'
+            f"</tr>"
+        )
+
+    # Header row
+    slot_labels = [(now - timedelta(hours=hours - i)).strftime("%H") for i in range(hours)]
+    th_slots = "".join(f"<th>{lbl}</th>" for lbl in slot_labels)
+    thead = (
+        f'<tr><th class="h-repo">repo</th>'
+        f"{th_slots}"
+        f'<th class="h-future">open tickets ▸ readiness</th></tr>'
+    )
+
+    # Legend
+    swatches = " ".join(
+        f'<span><span class="swatch" style="background:{OUTCOME_STYLE[o][0]}"></span>{label}</span>'
+        for o, label in LEGEND_OUTCOMES
+    )
+    legend_future = (
+        '<span style="color:#86efac">■ ready</span> '
+        '<span style="color:#93c5fd">■ doing</span> '
+        '<span style="color:#fdba74">■ blocked</span> '
+        '<span style="color:#78716c">■ pending</span> '
+        '· <span style="color:#ef4444">glow</span> = stale ≥14d'
+    )
+
+    refreshed = now.strftime("%Y-%m-%d %H:%M UTC")
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="refresh" content="60">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Beat dashboard</title>
+<style>{CSS}</style>
+</head>
+<body>
+<h1>Beat dashboard</h1>
+<form class="controls" method="get" action="/">
+  <label>Window:
+    <input type="number" name="hours" min="1" max="168" value="{hours}"> h
+  </label>
+  <button type="submit">apply</button>
+  <span class="ts">refreshed {refreshed} · auto-refreshes every 60 s</span>
+</form>
+<table>
+<thead>{thead}</thead>
+<tbody>{"".join(rows_html_parts)}</tbody>
+</table>
+<div class="legend">
+  {swatches}
+  &nbsp;|&nbsp;
+  {legend_future}
+</div>
+</body>
+</html>"""
+
+
+# ── HTTP server ───────────────────────────────────────────────────────────────
+
+class _Handler(http.server.BaseHTTPRequestHandler):
+    projects: list[Path] = []
+    default_hours: int = 24
+
+    def log_message(self, *_):  # silence access log
+        pass
+
+    def do_GET(self):
+        parsed = urlparse(self.path)
+        if parsed.path not in ("/", ""):
+            self.send_response(404)
+            self.end_headers()
+            return
+        qs = parse_qs(parsed.query)
+        try:
+            hours = int(qs.get("hours", [self.default_hours])[0])
+            hours = max(1, min(168, hours))
+        except (ValueError, IndexError):
+            hours = self.default_hours
+        body = build_html(self.projects, hours).encode()
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--port", type=int, default=8765, metavar="PORT")
+    ap.add_argument("--hours", type=int, default=24, metavar="N",
+                    help="default time window in hours (overridable per request via ?hours=N)")
+    ap.add_argument("--projects", default="", metavar="PATH:PATH:...",
+                    help="colon-separated list of project roots "
+                         "(default: parsed from ~/.claude/scripts/beat.sh)")
+    ap.add_argument("--no-browser", action="store_true",
+                    help="do not open browser automatically")
+    args = ap.parse_args()
+
+    projects = parse_projects(args.projects)
+    if not projects:
+        sys.exit("No projects found. Check ~/.claude/scripts/beat.sh or pass --projects.")
+
+    missing = [str(p) for p in projects if not p.is_dir()]
+    if missing:
+        print(f"Warning: these project paths don't exist: {', '.join(missing)}", file=sys.stderr)
+
+    _Handler.projects = projects
+    _Handler.default_hours = args.hours
+
+    url = f"http://127.0.0.1:{args.port}/?hours={args.hours}"
+    print(f"Projects : {[p.name for p in projects]}")
+    print(f"Dashboard: {url}")
+    print("Ctrl-C to stop.")
+
+    if not args.no_browser:
+        webbrowser.open(url)
+
+    http.server.HTTPServer(("127.0.0.1", args.port), _Handler).serve_forever()
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except KeyboardInterrupt:
+        print("\nStopped.")
