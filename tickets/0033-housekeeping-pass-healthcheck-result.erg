@@ -1,11 +1,13 @@
 %erg v1
 Title: Avoid duplicate git queries between housekeeping and healthcheck sub-skill
-Status: open
+Status: closed
 Created: 2026-04-27
 Author: claude
 
 --- log ---
 2026-04-27T00:00Z claude created
+2026-04-27T11:11Z claude note reimagined: premise invalid — housekeeping runs only 'git fetch' before calling /healthcheck (not 5-8 queries). Actual overlap: 1-2 calls at most. Neither option A nor B justified.
+2026-04-27T11:11Z claude status closed — outdated; claimed duplication does not exist in current or any historical housekeeping spec
 
 --- body ---
 ## Problem
