@@ -12,7 +12,7 @@ Level 4 (Hooks) + orchestrator + `/verify` loop + git-erg tickets + bibliography
 
 **Forge-agnostic**: leak-guard enforces no `gh`/`github.com` in skills. Coding rules (coding-python.md) loaded conditionally for Python projects only.
 
-**Nightbeat** (`claude-nightbeat.timer`) live on padme. Fires hourly 22:00–06:00 weeknights, all day weekends. `beat.py` hardcodes control flow (pick→orchestrate) in Python — no LLM orchestrator. Per-project lock allows concurrent beats on different projects. `project_scoped=True` on pick-ticket/orchestrator prevents cross-project ticket leakage. Orchestrator can now push branches and open PRs (push guard removed from `beat-settings.json`). Housekeeping budget raised to $0.35. `_cleanup_stale_in_progress()` runs at beat startup to rewrite buried orphan records. 60 pytest tests, ruff-clean.
+**Nightbeat** (`claude-nightbeat.timer`) live on padme. Fires hourly 22:00–06:00 weeknights, all day weekends. `beat.py` hardcodes control flow (pick→orchestrate) in Python — no LLM orchestrator. Per-project lock allows concurrent beats on different projects. `project_scoped=True` on pick-ticket/orchestrator prevents cross-project ticket leakage. Orchestrator can now push branches and open PRs (push guard removed from `beat-settings.json`). Housekeeping and pick-ticket budgets raised to $0.75 each. Ticket-ready now uses `erg ready --json` as primary filter (ticket 0031). Orphan-commits check removed from healthcheck (ticket 0032). `_cleanup_stale_in_progress()` runs at beat startup to rewrite buried orphan records. 60 pytest tests, ruff-clean.
 
 **Morning review**: `/nightbeat-report` skill runs `scripts/nightbeat-report.py`, narrates completed work, lists branches to push, and surfaces harness friction patterns.
 
