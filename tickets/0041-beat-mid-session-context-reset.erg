@@ -1,0 +1,50 @@
+%erg v1
+Title: Force context reset between housekeeping and pick-ticket sub-sessions
+Status: open
+Created: 2026-04-27
+Author: claude
+
+--- log ---
+2026-04-27T12:30Z claude created
+
+--- body ---
+## Problem
+
+The nightbeat orchestrator (`_orchestrate` in `beat.py`) runs housekeeping
+and pick-ticket as sequential Claude CLI invocations in the same beat.
+Each invocation is a fresh session, but the beat orchestrator itself
+accumulates context across the coordination turns. After several beats
+the outer session context grows with tool call results (git output, skill
+output) that are no longer needed for the next sub-task.
+
+Additionally, if a sub-session (housekeeping or pick-ticket) runs for many
+turns before context compaction kicks in automatically, a large fraction
+of its token budget is spent re-reading stale context rather than doing
+useful work.
+
+## Hypothesis (to validate before implementing)
+
+1. Does `beat.py` run as a persistent long-running Claude session, or does
+   each beat start a fresh session? If each beat is already a fresh `claude`
+   invocation, outer-session accumulation may not apply.
+
+2. Do housekeeping / pick-ticket sub-sessions grow beyond ~50 turns in
+   practice? Check beat logs for typical turn counts.
+
+## Solution candidates
+
+**A. Explicit `/compact` at session start** — add a `/compact` slash
+command call at the start of each skill invocation to flush stale context.
+Only useful if sessions are long-lived.
+
+**B. `--max-turns` cap** — pass `--max-turns 30` to each skill invocation
+so runaway sessions fail fast rather than burning tokens on re-reading context.
+
+**C. No-op** — if each beat is a fresh `claude` invocation with no history,
+context accumulation doesn't apply and this ticket can be closed.
+
+## Acceptance criteria
+
+- Beat logs or `beat.py` code reviewed to determine session model
+- If long-lived sessions exist: at least one mitigation (A or B) implemented
+- If sessions are already fresh per beat: ticket closed with explanation

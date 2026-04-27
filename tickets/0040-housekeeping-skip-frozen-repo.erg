@@ -1,0 +1,56 @@
+%erg v1
+Title: Skip housekeeping when repo is frozen (no commits, no ticket changes)
+Status: open
+Created: 2026-04-27
+Author: claude
+
+--- log ---
+2026-04-27T12:30Z claude created
+
+--- body ---
+## Problem
+
+`housekeeping_needed()` in `beat.py` only checks whether the last
+housekeeping commit is older than the configured interval. A repo that
+has had zero commits and zero ticket modifications since the last
+housekeeping run still triggers a full Sonnet session, paying ~$0.40
+to produce a STATE.md update that says "nothing changed".
+
+## Solution
+
+Extend `housekeeping_needed()` with a second condition: if the repo
+is "frozen" (no new commits AND no ticket files modified since the last
+housekeeping run), return False.
+
+```python
+def _repo_frozen_since(project: ProjectConfig, since: datetime) -> bool:
+    # No commits since last hk
+    log = subprocess.run(
+        ["git", "-C", str(project.path), "log",
+         f"--since={since.isoformat()}", "--oneline"],
+        capture_output=True, text=True
+    ).stdout.strip()
+    if log:
+        return False
+    # No ticket files changed since last hk
+    changed = subprocess.run(
+        ["git", "-C", str(project.path), "diff", "--name-only",
+         f"--diff-filter=M", f"HEAD@{{{since.isoformat()}}}"],
+        capture_output=True, text=True
+    ).stdout
+    ticket_changed = any("tickets/" in line for line in changed.splitlines())
+    return not ticket_changed
+```
+
+`housekeeping_needed()` calls `_repo_frozen_since(project, last_hk_time)`.
+If frozen, log a skip reason and return False.
+
+Note: ticket 0036 (skip if idle) may overlap — check before implementing.
+
+## Acceptance criteria
+
+- Housekeeping is skipped when `git log --since=<last_hk>` is empty AND
+  no `tickets/` files were modified since last hk
+- Skip is logged (beat log line or stdout) for observability
+- `test_beat.py` covers the frozen-skip path
+- Still runs normally when commits OR ticket changes are present

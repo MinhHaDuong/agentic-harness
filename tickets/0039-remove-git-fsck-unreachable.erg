@@ -1,0 +1,40 @@
+%erg v1
+Title: Remove or replace git fsck --unreachable in housekeeping
+Status: open
+Created: 2026-04-27
+Author: claude
+
+--- log ---
+2026-04-27T12:30Z claude created
+
+--- body ---
+## Problem
+
+Housekeeping runs `git fsck --unreachable` on every project at each beat.
+On large repos this is expensive (scans all objects) and produces verbose
+output that inflates the LLM context. Unreachable commits do not affect
+correctness or workflow — they are cleaned up automatically by `git gc`
+on its own schedule.
+
+## Solution
+
+Remove `git fsck --unreachable` from the housekeeping skill entirely.
+If the intent was to flag dangling objects, replace with:
+
+```bash
+git gc --auto
+```
+
+`git gc --auto` runs only when thresholds are met (default: 6700 loose
+objects or 50 packs) and produces no output when there is nothing to do.
+It is idempotent and safe to call every run.
+
+If there is no `git fsck` call in the current skill text, confirm by
+grepping skills/housekeeping/ and close this ticket.
+
+## Acceptance criteria
+
+- `git fsck --unreachable` does not appear in any housekeeping skill file
+- Either `git gc --auto` is present, or the decision to omit it entirely
+  is documented in a skill comment
+- Housekeeping runs produce no fsck output in their logs

@@ -1,0 +1,44 @@
+%erg v1
+Title: Use Haiku model for pick-ticket when repo has no recent commits
+Status: open
+Created: 2026-04-27
+Author: claude
+
+--- log ---
+2026-04-27T12:30Z claude created
+
+--- body ---
+## Problem
+
+Pick-ticket runs on Sonnet regardless of repo activity. When `git log
+--since="24h"` is empty the task is purely mechanical — read metadata,
+compare cached scope/risk, rank by risk, write one line — no difficult
+judgment required. Paying Sonnet rates for that is wasteful.
+
+## Solution
+
+In `beat.py`, before launching the pick-ticket skill, check whether any
+commits landed in the last 24 h:
+
+```python
+def _repo_active(project: ProjectConfig) -> bool:
+    result = subprocess.run(
+        ["git", "-C", str(project.path), "log", "--since=24h", "--oneline"],
+        capture_output=True, text=True
+    )
+    return bool(result.stdout.strip())
+```
+
+If `_repo_active()` returns False, pass `--model claude-haiku-4-5-20251001`
+(or the current Haiku model ID) to the pick-ticket skill invocation.
+Otherwise keep Sonnet.
+
+Add a `pick_ticket_model` field to `ProjectConfig` defaulting to the
+current Haiku model ID, so per-project overrides remain possible.
+
+## Acceptance criteria
+
+- `beat.py` uses Haiku for pick-ticket when `git log --since=24h` is empty
+- Sonnet still used on active days
+- Configurable per-project via `ProjectConfig.pick_ticket_model`
+- `test_beat.py` covers both branches (active / idle)
