@@ -400,7 +400,7 @@ class TestOrchestrate:
             patch("beat.housekeeping_needed", return_value=False),
             self._patch_run_skill({"pick-ticket": (0, "IDLE: empty queue")}),
         ):
-            outcome, ticket = beat._orchestrate(tmp_project)
+            outcome, ticket = beat._orchestrate(beat.ProjectConfig(path=tmp_project))
         assert outcome == "idle"
         assert ticket is None
 
@@ -414,7 +414,7 @@ class TestOrchestrate:
                 }
             ),
         ):
-            outcome, ticket = beat._orchestrate(tmp_project)
+            outcome, ticket = beat._orchestrate(beat.ProjectConfig(path=tmp_project))
         assert outcome == "done"
         assert ticket == "0023"
 
@@ -423,7 +423,7 @@ class TestOrchestrate:
             patch("beat.housekeeping_needed", return_value=False),
             self._patch_run_skill({"pick-ticket": (beat.TIMEOUT_EXIT_CODE, "")}),
         ):
-            outcome, ticket = beat._orchestrate(tmp_project)
+            outcome, ticket = beat._orchestrate(beat.ProjectConfig(path=tmp_project))
         assert outcome == "aborted"
         assert ticket is None
 
@@ -432,7 +432,7 @@ class TestOrchestrate:
             patch("beat.housekeeping_needed", return_value=False),
             self._patch_run_skill({"pick-ticket": (1, "")}),
         ):
-            outcome, ticket = beat._orchestrate(tmp_project)
+            outcome, ticket = beat._orchestrate(beat.ProjectConfig(path=tmp_project))
         assert outcome == "failed"
         assert ticket is None
 
@@ -446,7 +446,7 @@ class TestOrchestrate:
                 }
             ),
         ):
-            outcome, ticket = beat._orchestrate(tmp_project)
+            outcome, ticket = beat._orchestrate(beat.ProjectConfig(path=tmp_project))
         assert outcome == "aborted"
         assert ticket == "0005"
 
@@ -460,7 +460,7 @@ class TestOrchestrate:
                 }
             ),
         ):
-            outcome, ticket = beat._orchestrate(tmp_project)
+            outcome, ticket = beat._orchestrate(beat.ProjectConfig(path=tmp_project))
         assert outcome == "failed"
         assert ticket == "0005"
 
@@ -477,7 +477,7 @@ class TestOrchestrate:
             patch("beat.housekeeping_needed", return_value=True),
             patch("beat.run_skill", side_effect=fake_run_skill),
         ):
-            beat._orchestrate(tmp_project)
+            beat._orchestrate(beat.ProjectConfig(path=tmp_project))
 
         assert any("housekeeping" in c for c in calls)
 
@@ -492,7 +492,7 @@ class TestOrchestrate:
             patch("beat.housekeeping_needed", return_value=False),
             patch("beat.run_skill", side_effect=fake_run_skill),
         ):
-            beat._orchestrate(tmp_project)
+            beat._orchestrate(beat.ProjectConfig(path=tmp_project))
 
         assert not any("housekeeping" in c for c in calls)
 
@@ -529,7 +529,7 @@ class TestProjectScopedIsolation:
             patch("beat.housekeeping_needed", return_value=False),
             patch("beat.run_skill", side_effect=fake_run_skill),
         ):
-            beat._orchestrate(tmp_project)
+            beat._orchestrate(beat.ProjectConfig(path=tmp_project))
 
         pick_call = next(r for r in recorded if "pick-ticket" in r["skill"])
         assert pick_call["project_scoped"] is True
@@ -547,7 +547,7 @@ class TestProjectScopedIsolation:
             patch("beat.housekeeping_needed", return_value=False),
             patch("beat.run_skill", side_effect=fake_run_skill),
         ):
-            beat._orchestrate(tmp_project)
+            beat._orchestrate(beat.ProjectConfig(path=tmp_project))
 
         oc_call = next(r for r in recorded if "orchestrator" in r["skill"])
         assert oc_call["project_scoped"] is True
@@ -563,7 +563,7 @@ class TestProjectScopedIsolation:
             patch("beat.housekeeping_needed", return_value=True),
             patch("beat.run_skill", side_effect=fake_run_skill),
         ):
-            beat._orchestrate(tmp_project)
+            beat._orchestrate(beat.ProjectConfig(path=tmp_project))
 
         hk_call = next(r for r in recorded if "housekeeping" in r["skill"])
         assert hk_call["project_scoped"] is False
@@ -593,7 +593,7 @@ class TestPerProjectLock:
             patch("beat.signal.signal"),
             patch("beat._setup_env"),
             patch.object(beat, "LOGDIR", tmp_path / "logs"),
-            patch("beat._pick_project", return_value=(0, tmp_project)),
+            patch("beat._pick_project", return_value=(0, beat.ProjectConfig(path=tmp_project))),
             patch.object(beat, "_LOCK_DIR", fake_lock_dir),
             patch("beat.fcntl.flock", side_effect=BlockingIOError),
             pytest.raises(SystemExit) as exc_info,
@@ -674,7 +674,7 @@ class TestSpinDown:
             beat._state.project = tmp_project
             beat._state.final_written = False
             beat.DRY_RUN = False
-            outcome, ticket = beat._orchestrate(tmp_project)
+            outcome, ticket = beat._orchestrate(beat.ProjectConfig(path=tmp_project))
             beat.finalize_beat_log(
                 tmp_project,
                 {
