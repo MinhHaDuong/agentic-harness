@@ -26,6 +26,8 @@ This skill is user-level and must **gracefully degrade**: each check runs only i
    - **Staleness** — flag docs whose content predates recent repo activity
    - **Ticket cross-check** — references to tickets whose status contradicts
      the doc (todo but closed, done but open, broken ref). Skip if no `.erg` tickets.
+     (Use `erg ready --json` for the initial ticket list; only read specific tickets
+     whose status contradicts a doc reference.)
    - **PR cross-check** — PRs described as pending but already merged/closed.
      Skip if `gh` unavailable.
    - **Count consistency** — "N open tickets" claims vs actual count

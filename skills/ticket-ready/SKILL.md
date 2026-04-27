@@ -10,6 +10,22 @@ argument-hint:
 
 ## Steps
 
+1. Run the CLI to list ready tickets:
+   ```bash
+   tickets/tools/go/erg ready tickets/ --json
+   ```
+   Returns JSON: `[{"id":"0013","title":"...","file":"..."},...]`
+   The command handles Blocked-by resolution and `.wip` claim exclusion.
+
+2. `.wip` claim check — `erg ready` already excludes claimed tickets. No manual
+   check needed unless the binary is absent (see Fallback below).
+
+3. Display ready tickets (unblocked + unclaimed).
+
+## Fallback (if erg binary is absent)
+
+If `tickets/tools/go/erg` does not exist, degrade gracefully:
+
 1. Read all `tickets/*.erg` files.
 
 2. For each ticket with `Status: open`:
@@ -24,14 +40,3 @@ argument-hint:
      ```
 
 3. Display ready tickets (unblocked + unclaimed).
-
-## Alternative: use the CLI
-
-```bash
-tickets/tools/go/erg ready tickets/
-```
-
-With JSON output:
-```bash
-tickets/tools/go/erg ready tickets/ --json
-```

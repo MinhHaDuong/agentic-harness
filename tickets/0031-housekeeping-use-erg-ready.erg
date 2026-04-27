@@ -1,0 +1,45 @@
+%erg v1
+Title: Replace grep-based ticket scanning with erg ready --json in housekeeping and pick-ticket
+Status: doing
+Created: 2026-04-27
+Author: claude
+
+--- log ---
+2026-04-27T00:00Z claude created
+2026-04-27T12:00Z claude doing orchestrator
+
+--- body ---
+## Problem
+
+Both housekeeping and pick-ticket use `grep -E "Status:" tickets/*.erg` to filter
+tickets, then re-read each file individually. This loads raw file content into the
+LLM context unnecessarily. `erg ready --json` already does this filtering in Go.
+
+## Solution
+
+Replace the grep+read pattern with a single `erg ready --json` call that returns
+structured data (ticket id, title, status, blocked-by) — the LLM only sees what
+it needs to make a decision, not full file content.
+
+## Acceptance criteria
+
+- `housekeeping` and `pick-ticket` use `erg ready --json` as the first ticket filter
+- Individual ticket files are only read for candidates that pass the filter
+- Token count for ticket scanning step reduced vs baseline
+
+## Effort
+
+Low — mostly skill prompt edits, no new infrastructure.
+
+## Actions (planned)
+
+1. `skills/ticket-ready/SKILL.md`: Replace "Read all tickets/*.erg files" step
+   with `erg ready --json` as PRIMARY method. Keep manual read as fallback only
+   if erg binary absent. Remove "Alternative" framing.
+2. `skills/pick-ticket/SKILL.md`: After Step 1 (/ticket-ready), add explicit
+   instruction to only read individual ticket files for candidates that need
+   sweep-skip cache verification (body hash check). Do NOT read all bodies.
+3. `skills/healthcheck/SKILL.md`: In docs freshness / ticket cross-check, add
+   note to use `erg ready --json` for the initial ticket list instead of reading
+   all files. Only read specific tickets whose status contradicts a doc reference.
+4. Run tests, validate tickets, commit
