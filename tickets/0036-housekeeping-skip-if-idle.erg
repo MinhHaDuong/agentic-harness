@@ -1,0 +1,36 @@
+%erg v1
+Title: Skip housekeeping when repo has no changes since last run
+Status: open
+Created: 2026-04-27
+Author: claude
+
+--- log ---
+2026-04-27T00:00Z claude created
+
+--- body ---
+## Problem
+
+`housekeeping_needed()` in beat.py only checks if the last housekeeping commit is
+older than HOUSEKEEPING_INTERVAL_S (currently not enforced — it always runs).
+A frozen repo (no new commits, no ticket changes, no new branches) gains nothing
+from a full housekeeping run.
+
+## Solution
+
+Extend `housekeeping_needed()` to also check:
+1. Any commits since last housekeeping commit? (`git log <last-hk>..HEAD --oneline`)
+2. Any tickets modified since last housekeeping? (`git diff --name-only <last-hk> HEAD -- tickets/`)
+3. Any new/deleted local branches since last housekeeping?
+
+If all three are empty → skip housekeeping, log "housekeeping: skipped (no changes)".
+
+## Acceptance criteria
+
+- Housekeeping skipped on idle repos (no git activity since last hk commit)
+- Still runs at least once per 24h regardless (safety floor)
+- Log shows skip reason
+
+## Notes
+
+Risk: misses external changes (remote pushes by other agents). Mitigation: git fetch
+is already part of housekeeping_needed check, or run git fetch before the idle check.

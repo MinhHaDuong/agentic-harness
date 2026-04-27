@@ -1,0 +1,35 @@
+%erg v1
+Title: Cache ticket scan in housekeeping to avoid re-reading unchanged files
+Status: open
+Created: 2026-04-27
+Author: claude
+
+--- log ---
+2026-04-27T00:00Z claude created
+
+--- body ---
+## Problem
+
+Housekeeping scans all tickets on every run to find expired sweep-skip entries and
+update pick-assessments. Climate_finance has ~125 tickets; reading them all costs
+$0.30–0.40 alone and grows with the repo.
+
+## Solution
+
+Store a scan manifest in `.claude/sweep-state/hk-scan-cache.json`:
+- per-file: `{path, mtime_or_sha, last_scanned}`
+- Skip files unchanged since last scan (compare git blob sha or mtime)
+- Only re-read tickets modified since last housekeeping commit
+
+Use `git diff --name-only <last-hk-commit> HEAD -- tickets/` to get the changed set.
+
+## Acceptance criteria
+
+- Housekeeping reads ≤ changed tickets + newly-expired sweep-skip on each run
+- Cache file committed alongside housekeeping changes
+- Regression: still catches all expired sweep-skip entries
+
+## Notes
+
+Synergistic with ticket 0027 (pick-ticket incremental assessment), which uses
+the same principle for pick-ticket.

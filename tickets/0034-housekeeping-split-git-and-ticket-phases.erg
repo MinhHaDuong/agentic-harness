@@ -1,0 +1,39 @@
+%erg v1
+Title: Split housekeeping into git-cleanup phase and ticket-scan phase
+Status: open
+Created: 2026-04-27
+Author: claude
+
+--- log ---
+2026-04-27T00:00Z claude created
+
+--- body ---
+## Problem
+
+Housekeeping does two expensive things in one session:
+1. Git hygiene: stale branches, worktrees, STATE.md, commit
+2. Ticket scan: sweep-skip expiry, pick-assessments
+
+Combining them in a single long session (30–41 turns, $0.50+) means a budget
+overflow in phase 2 undoes partially-committed phase 1 work visually (hk:rc=1 even
+if the git cleanup was committed).
+
+## Solution
+
+Run housekeeping in two sequential sub-calls from beat.py:
+1. `run_skill("/housekeeping-git", budget=0.35)` — git only, always runs
+2. `run_skill("/housekeeping-tickets", budget=0.40)` — ticket scan, runs only if
+   there are tickets to re-assess
+
+Each can succeed independently. Beat.py marks hk:done if phase 1 succeeds, even
+if phase 2 is skipped or fails.
+
+## Acceptance criteria
+
+- Git cleanup always completes within $0.35 budget
+- Ticket scan is optional and skippable
+- beat.py distinguishes hk-git:done from hk-tickets:done in the log
+
+## Notes
+
+Requires new skill files and beat.py changes. Larger effort than 0031/0032.

@@ -53,8 +53,8 @@ CRASH_RECOVERY_WINDOW_S: int = 55 * 60
 LOG_RETAIN_COUNT: int = 60
 TIMEOUT_EXIT_CODE: int = 124  # matches bash `timeout` convention
 
-BUDGET_HOUSEKEEPING: float = 0.35
-BUDGET_PICK_TICKET: float = 0.50
+BUDGET_HOUSEKEEPING: float = 0.75
+BUDGET_PICK_TICKET: float = 0.75
 BUDGET_ORCHESTRATOR: float = 5.00
 
 DRY_RUN: bool = os.environ.get("BEAT_DRY_RUN") == "1"

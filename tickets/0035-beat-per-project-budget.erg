@@ -1,0 +1,39 @@
+%erg v1
+Title: Make housekeeping and pick-ticket budgets configurable per project
+Status: open
+Created: 2026-04-27
+Author: claude
+
+--- log ---
+2026-04-27T00:00Z claude created
+
+--- body ---
+## Problem
+
+`BUDGET_HOUSEKEEPING = 0.75` and `BUDGET_PICK_TICKET = 0.75` are global constants
+in beat.py. Small projects (aedist: $0.37 per run) pay the same ceiling as large
+ones (Climate_finance: $0.51+). Raising the global to cover large projects wastes
+headroom on small ones.
+
+## Solution
+
+Add per-project budget overrides to `beat-settings.json` (or a per-project
+`.claude/beat-project.json`):
+
+```json
+{
+  "projects": {
+    "Climate_finance": { "budget_housekeeping": 0.75, "budget_pick_ticket": 0.75 },
+    "fuzzy-corpus":    { "budget_housekeeping": 0.75, "budget_pick_ticket": 0.50 },
+    "aedist-technical-report": { "budget_housekeeping": 0.40 }
+  }
+}
+```
+
+beat.py reads the override for the current project at startup, falls back to global.
+
+## Acceptance criteria
+
+- beat.py reads per-project budget overrides
+- aedist-technical-report and cadens run with lower budgets than Climate_finance
+- Defaults unchanged if no override present

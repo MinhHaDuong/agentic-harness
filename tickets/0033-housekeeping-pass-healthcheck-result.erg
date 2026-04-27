@@ -1,0 +1,32 @@
+%erg v1
+Title: Avoid duplicate git queries between housekeeping and healthcheck sub-skill
+Status: open
+Created: 2026-04-27
+Author: claude
+
+--- log ---
+2026-04-27T00:00Z claude created
+
+--- body ---
+## Problem
+
+Housekeeping calls `healthcheck` as a Skill tool (same session). The healthcheck
+skill re-runs all git queries (fetch, branch list, worktree list, PR list) that
+housekeeping already ran in earlier turns. This duplicates 5–8 Bash calls and
+re-populates the LLM context with redundant output.
+
+## Solution
+
+Option A: Inline healthcheck logic into housekeeping — remove the sub-skill call,
+fold the checks directly. Simpler, one session, no duplication.
+
+Option B: Run healthcheck FIRST and pass its output as structured context to the
+housekeeping agent, so housekeeping doesn't re-query.
+
+Option A is simpler and preferred given the skill runs in the same session anyway.
+
+## Acceptance criteria
+
+- No duplicate git queries across housekeeping + healthcheck in a single run
+- Healthcheck report still generated and committed
+- Turn count for housekeeping reduced by ~5–8 turns
