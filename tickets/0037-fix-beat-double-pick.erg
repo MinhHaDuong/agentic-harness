@@ -1,0 +1,63 @@
+%erg v1
+Title: Fix beat double-pick: orchestrateur termine sans fermer le ticket
+Status: open
+Created: 2026-04-27
+Author: claude
+
+--- log ---
+2026-04-27T09:00Z claude created
+
+--- body ---
+## Context
+
+La nuit du 26-27 avril a montré deux tickets retravaillés deux fois par le
+nightbeat : 0026 (cadens) et 0048 (fuzzy-corpus).
+
+**Cause réelle** (confirmée par analyse des logs) : l'orchestrateur retourne
+rc=0 — ce que beat.py interprète comme `outcome=done` — sans avoir fermé ni
+même réclamé le ticket. Le ticket reste donc `Status: open`, et le cycle
+suivant (4h plus tard, rotation normale) le sélectionne à nouveau via
+`/ticket-ready`.
+
+Ce n'est **pas** une race condition de démarrage : l'écart entre les deux
+picks est ~4h, bien au-delà de tout délai de propagation.
+
+Exemples observés :
+- Ticket 0026 : pick à 21:03Z (run 45), aucun commit cadens, ticket resté
+  open. Re-pick à 01:03Z (run 49), fermeture à 01:17Z. Durée gaspillée : ~21
+  min.
+- Ticket 0048 : pick à 23:14Z (run 47), pick à 03:13Z (run 51), toujours
+  `Status: open` après deux runs. Durée gaspillée : ~22 + 27 min.
+
+Le mécanisme du bug : pick-ticket filtre sur `Status: open` via
+`/ticket-ready`. Le log `sweep-pick: selected` dans le .erg n'est pas un
+guard d'exclusion — pick-ticket ne le consulte pas pour éviter les re-picks.
+
+## Actions
+
+1. **Guard dans pick-ticket (option A — prioritaire)** : dans la phase
+   d'exclusion (étape 2 du skill), ajouter une règle : si le log du ticket
+   contient un `sweep-pick: selected` daté de moins de 8h et que le status
+   est encore `open`, traiter comme `cooldown-recent-pick` et émettre un
+   sweep-skip (même format que `cooldown-24h` mais délai plus court).
+   Raison : `sweep-pick: selected` suivi d'un ticket encore open indique que
+   l'orchestrateur n'a pas conclu — le re-pick immédiat est inutile.
+
+2. **Warning post-orchestrateur dans beat.py (option B — monitoring)** :
+   après `outcome=done`, lire le status du ticket via `grep "^Status:"
+   tickets/{id}-*.erg` et loguer un warning si le status n'est pas `closed`
+   ou `doing`. Ça ne bloque pas mais rend le problème visible dans les logs
+   nightbeat.
+
+3. Vérifier pourquoi l'orchestrateur termine avec rc=0 sans clore le ticket
+   (budget épuisé ? décision implicite "pas de travail" sans appel à
+   `/ticket-close` ?) — instrumenter un run de test pour capturer le motif.
+
+## Exit criteria
+
+- Un ticket précédemment `sweep-pick: selected` et encore `open` ne peut
+  pas être re-sélectionné avant 8h (guard A en place et testé manuellement).
+- beat.py logue un warning quand outcome=done mais Status≠closed après
+  l'orchestrateur (option B en place).
+- Les logs nightbeat ne montrent plus de double-pick pour le même ticket
+  sur deux cycles consécutifs.
