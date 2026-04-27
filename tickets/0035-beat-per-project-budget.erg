@@ -1,11 +1,14 @@
 %erg v1
 Title: Make housekeeping and pick-ticket budgets configurable per project
-Status: open
+Status: doing
 Created: 2026-04-27
 Author: claude
 
 --- log ---
 2026-04-27T00:00Z claude created
+2026-04-27T11:11Z claude note reimagined: ProjectConfig dataclass in beat.py; no external JSON; BEAT_PROJECT override gets default config; one file only
+2026-04-27T11:11Z claude note planned: (1) add ProjectConfig dataclass after _State; (2) replace PROJECTS list[Path] with list[ProjectConfig]; (3) _pick_project returns ProjectConfig; (4) _orchestrate reads budgets from config; (5) BEAT_PROJECT fallback to ProjectConfig(path, defaults)
+2026-04-27T11:11Z claude status doing — orchestrator
 
 --- body ---
 ## Problem
