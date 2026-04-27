@@ -1,11 +1,12 @@
 %erg v1
 Title: Cache ticket scan in housekeeping to avoid re-reading unchanged files
-Status: open
+Status: closed
 Created: 2026-04-27
 Author: claude
 
 --- log ---
 2026-04-27T00:00Z claude created
+2026-04-27T11:04Z claude status closed — problem addressed via different approach: (1) housekeeping skill no longer scans ticket bodies directly; (2) erg ready --json now emits cache:hit/miss/skip with body hash (36ce324); (3) sweep-skip expiry now checked in binary (parseSweepCache); (4) 0036 skips housekeeping entirely on idle repos. JSON manifest + git-diff approach from ticket body not needed.
 
 --- body ---
 ## Problem
