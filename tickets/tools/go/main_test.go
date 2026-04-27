@@ -118,6 +118,199 @@ func minimalErg(id, slug string, blockedBy []string) string {
 	return sb.String()
 }
 
+// ---------------------------------------------------------------------------
+// bodyHash
+// ---------------------------------------------------------------------------
+
+func TestBodyHashStableAcrossAssessments(t *testing.T) {
+	body := "## Context\nSome work.\n\n## Actions\n1. Do it.\n"
+	h1 := bodyHash(body)
+	if len(h1) != 12 {
+		t.Fatalf("expected 12 hex chars, got %d: %q", len(h1), h1)
+	}
+	// Appending a Picker assessment must not change the hash.
+	bodyWithAssess := body + "\n## Picker assessment 2026-04-27T10:00Z\n**Decision:** not picked\n"
+	h2 := bodyHash(bodyWithAssess)
+	if h1 != h2 {
+		t.Errorf("hash changed after appending assessment: %s → %s", h1, h2)
+	}
+	// Multiple assessments: still stable.
+	bodyWith2 := bodyWithAssess + "\n## Picker assessment 2026-04-28T10:00Z\n**Decision:** picked\n"
+	h3 := bodyHash(bodyWith2)
+	if h1 != h3 {
+		t.Errorf("hash changed after second assessment: %s → %s", h1, h3)
+	}
+}
+
+func TestBodyHashChangesOnCoreEdit(t *testing.T) {
+	body1 := "## Actions\n1. Original.\n"
+	body2 := "## Actions\n1. Changed.\n"
+	if bodyHash(body1) == bodyHash(body2) {
+		t.Error("hash should differ for different body content")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// parseSweepCache
+// ---------------------------------------------------------------------------
+
+func TestParseSweepCacheMiss(t *testing.T) {
+	lines := []string{"2026-04-26T00:00Z claude created"}
+	info := parseSweepCache(lines)
+	if info.cacheType != "miss" {
+		t.Errorf("expected miss, got %s", info.cacheType)
+	}
+}
+
+func TestParseSweepCacheHit(t *testing.T) {
+	hash := bodyHash("Some body.\n")
+	lines := []string{
+		"2026-04-26T00:00Z claude created",
+		"2026-04-27T10:00Z claude note sweep-assess: not-picked hash:" + hash + " scope:30m/4f risk:low",
+	}
+	info := parseSweepCache(lines)
+	if info.cacheType != "hit" {
+		t.Errorf("expected hit, got %s", info.cacheType)
+	}
+	if info.hash != hash {
+		t.Errorf("expected hash %s, got %s", hash, info.hash)
+	}
+	if info.scope != "30m/4f" {
+		t.Errorf("expected scope 30m/4f, got %q", info.scope)
+	}
+	if info.risk != "low" {
+		t.Errorf("expected risk low, got %q", info.risk)
+	}
+}
+
+func TestParseSweepCacheStaleHash(t *testing.T) {
+	lines := []string{
+		"2026-04-27T10:00Z claude note sweep-assess: not-picked hash:000000000000 scope:30m risk:low",
+	}
+	info := parseSweepCache(lines)
+	// parseSweepCache returns the stored hash; caller compares with current hash.
+	if info.hash != "000000000000" {
+		t.Errorf("expected stored hash 000000000000, got %q", info.hash)
+	}
+}
+
+func TestParseSweepCacheSkip(t *testing.T) {
+	hash := bodyHash("Body.\n")
+	lines := []string{
+		"2026-04-27T10:00Z claude note sweep-skip: status-needs-human hash:" + hash,
+	}
+	info := parseSweepCache(lines)
+	if info.cacheType != "skip" {
+		t.Errorf("expected skip, got %s", info.cacheType)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// cmdSweepWrite
+// ---------------------------------------------------------------------------
+
+func captureStdout(fn func()) string {
+	old := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+	fn()
+	w.Close()
+	os.Stdout = old
+	out, _ := io.ReadAll(r)
+	return string(out)
+}
+
+func ergWithLog(id string, logLines []string) string {
+	var sb strings.Builder
+	sb.WriteString("%erg v1\n")
+	sb.WriteString("Title: test " + id + "\n")
+	sb.WriteString("Status: open\n")
+	sb.WriteString("Created: 2026-04-26\n")
+	sb.WriteString("Author: test\n")
+	sb.WriteString("\n--- log ---\n")
+	for _, l := range logLines {
+		sb.WriteString(l + "\n")
+	}
+	sb.WriteString("\n--- body ---\n")
+	sb.WriteString("Core body.\n")
+	return sb.String()
+}
+
+func TestCmdSweepWriteWrites(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "0001-alpha.erg")
+	if err := os.WriteFile(path, []byte(ergWithLog("0001", nil)), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	out := captureStdout(func() {
+		cmdSweepWrite([]string{path, "not-picked", "30m/4f", "low", "riper ticket available"})
+	})
+	if !strings.Contains(out, "WROTE") {
+		t.Errorf("expected WROTE, got %q", out)
+	}
+
+	// File should now contain the assessment section and log line.
+	raw, _ := os.ReadFile(path)
+	content := string(raw)
+	if !strings.Contains(content, "## Picker assessment") {
+		t.Error("assessment section not written to body")
+	}
+	if !strings.Contains(content, "sweep-assess:") {
+		t.Error("sweep-assess log line not written")
+	}
+}
+
+func TestCmdSweepWriteCached(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "0001-alpha.erg")
+
+	// Pre-compute hash for "Core body.\n"
+	hash := bodyHash("Core body.\n")
+	logLines := []string{
+		"2026-04-26T00:00Z claude created",
+		"2026-04-27T10:00Z claude note sweep-assess: not-picked hash:" + hash + " scope:30m risk:low",
+	}
+	if err := os.WriteFile(path, []byte(ergWithLog("0001", logLines)), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	out := captureStdout(func() {
+		cmdSweepWrite([]string{path, "not-picked", "30m", "low", "same as before"})
+	})
+	if !strings.Contains(out, "CACHED") {
+		t.Errorf("expected CACHED, got %q", out)
+	}
+
+	// File must not have changed.
+	raw, _ := os.ReadFile(path)
+	if strings.Contains(string(raw), "## Picker assessment") {
+		t.Error("assessment section written despite cache hit")
+	}
+}
+
+func TestCmdSweepWriteHashStableAfterWrite(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "0001-alpha.erg")
+	if err := os.WriteFile(path, []byte(ergWithLog("0001", nil)), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// First write.
+	captureStdout(func() {
+		cmdSweepWrite([]string{path, "not-picked", "30m", "low", "reason A"})
+	})
+
+	// Second write on same body — must be CACHED (hash unchanged after first write).
+	out := captureStdout(func() {
+		cmdSweepWrite([]string{path, "not-picked", "30m", "low", "reason B"})
+	})
+	if !strings.Contains(out, "CACHED") {
+		t.Errorf("expected CACHED on second write, got %q", out)
+	}
+}
+
+// ---------------------------------------------------------------------------
 // TestCmdValidateFileArgCycleDetected ensures that a mutual dependency cycle
 // (0001 → 0002 → 0001) is detected even when only 0001's file is passed.
 func TestCmdValidateFileArgCycleDetected(t *testing.T) {
