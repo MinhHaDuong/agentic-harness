@@ -19,13 +19,14 @@ This skill is user-level and must **gracefully degrade**: each check runs only i
 3. **Origin sync** — ahead/behind/synced. Skip if no remote.
 4. **Branch hygiene** — list all, flag stale feature branches
 5. **Worktrees** — list all, flag orphaned ones
-6. **Orphan commits** — count unreachable commits
-7. **Working tree** — clean or list uncommitted changes
-8. **Tests green** — autodetect test runner (make/pytest/npm), report pass/fail
-9. **Docs freshness (deep verification)** — cross-check status/directive docs (`STATE.md`, `README.md`, etc.):
+6. **Working tree** — clean or list uncommitted changes
+7. **Tests green** — autodetect test runner (make/pytest/npm), report pass/fail
+8. **Docs freshness (deep verification)** — cross-check status/directive docs (`STATE.md`, `README.md`, etc.):
    - **Staleness** — flag docs whose content predates recent repo activity
    - **Ticket cross-check** — references to tickets whose status contradicts
      the doc (todo but closed, done but open, broken ref). Skip if no `.erg` tickets.
+     (Use `erg ready --json` for the initial ticket list; only read specific tickets
+     whose status contradicts a doc reference.)
    - **PR cross-check** — PRs described as pending but already merged/closed.
      Skip if `gh` unavailable.
    - **Count consistency** — "N open tickets" claims vs actual count
@@ -42,7 +43,6 @@ This skill is user-level and must **gracefully degrade**: each check runs only i
 | Origin sync      | ...    | synced / ahead N / ...       |
 | Branch hygiene   | ...    | N local, N remote            |
 | Worktrees        | ...    | N active                     |
-| Orphan commits   | ...    | none / N found               |
 | Working tree     | ...    | clean / N changes            |
 | Tests green      | ...    | N passed / K failed          |
 | Docs freshness   | ...    | N docs scanned, K stale refs |

@@ -14,6 +14,10 @@ Attempt history is read directly from each ticket's `## Attempt log` section.
 
 1. Run /ticket-ready to list open, unblocked tickets.
 
+   The /ticket-ready output provides ticket IDs and titles without loading full
+   file contents. Only read individual ticket files when needed for sweep-skip
+   hash verification or scope assessment.
+
 **Step 1.5 — Fast-path via sweep-skip cache**
 
 Before reading any ticket body or estimating scope, scan each candidate's

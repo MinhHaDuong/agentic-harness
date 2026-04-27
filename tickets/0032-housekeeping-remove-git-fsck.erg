@@ -1,0 +1,40 @@
+%erg v1
+Title: Remove git fsck --unreachable from housekeeping healthcheck
+Status: doing
+Created: 2026-04-27
+Author: claude
+
+--- log ---
+2026-04-27T00:00Z claude created
+2026-04-27T12:00Z claude doing orchestrator
+
+--- body ---
+## Problem
+
+Housekeeping runs `git fsck --unreachable` on every beat to count dangling commits.
+On large repos (Climate_finance: ~2100 commits) this is slow and its output (a count)
+adds nothing actionable — housekeeping never acts on unreachable commits.
+
+## Solution
+
+Remove the `git fsck --unreachable` call from the healthcheck skill.
+Replace with `git gc --auto 2>/dev/null || true` if GC hygiene is desired
+(gc --auto is a no-op unless the pack threshold is exceeded).
+
+## Acceptance criteria
+
+- healthcheck skill no longer calls git fsck
+- No regression in detecting actual repo problems (corrupt objects, broken refs)
+- git gc --auto added if desired, otherwise removed entirely
+
+## Effort
+
+Very low — one-line skill prompt / Bash change.
+
+## Actions (planned)
+
+1. `skills/healthcheck/SKILL.md` line 22: delete check #6 "Orphan commits — count unreachable commits"
+2. Same file line 45: delete "Orphan commits" row from the output table
+3. Renumber checks 7→6, 8→7, 9→8
+4. Do NOT add `git gc --auto` — not needed, out of scope
+5. Run tests, validate tickets, commit
