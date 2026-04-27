@@ -1,12 +1,13 @@
 %erg v1
 Title: Replace grep-based ticket scanning with erg ready --json in housekeeping and pick-ticket
-Status: doing
+Status: closed
 Created: 2026-04-27
 Author: claude
 
 --- log ---
 2026-04-27T00:00Z claude created
 2026-04-27T12:00Z claude doing orchestrator
+2026-04-27T11:04Z claude status closed — merged in eb3031d (housekeeping + healthcheck now use erg ready --json)
 
 --- body ---
 ## Problem
