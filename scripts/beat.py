@@ -27,13 +27,6 @@ from pathlib import Path
 
 HARNESS_DIR = Path.home() / ".claude"
 
-PROJECTS: list[Path] = [
-    Path.home() / "aedist-technical-report",
-    Path.home() / "cadens",
-    Path.home() / "Climate_finance",
-    Path.home() / "fuzzy-corpus",
-]
-
 LOGDIR = HARNESS_DIR / "logs" / "nightbeat"
 COUNTER_FILE = LOGDIR / ".run-counter"
 
@@ -75,6 +68,39 @@ class _State:
 
 
 _state = _State()
+
+
+# ── Per-project configuration ─────────────────────────────────────────────────
+
+
+@dataclass
+class ProjectConfig:
+    """Per-project beat settings; budget fields default to the global constants."""
+
+    path: Path
+    budget_housekeeping: float = BUDGET_HOUSEKEEPING
+    budget_pick_ticket: float = BUDGET_PICK_TICKET
+
+
+PROJECTS: list[ProjectConfig] = [
+    ProjectConfig(
+        path=Path.home() / "aedist-technical-report",
+        budget_housekeeping=0.40,
+        budget_pick_ticket=0.50,
+    ),
+    ProjectConfig(
+        path=Path.home() / "cadens",
+        budget_housekeeping=0.40,
+        budget_pick_ticket=0.50,
+    ),
+    ProjectConfig(path=Path.home() / "Climate_finance"),
+    ProjectConfig(path=Path.home() / "fuzzy-corpus"),
+    ProjectConfig(
+        path=HARNESS_DIR,
+        budget_housekeeping=0.40,
+        budget_pick_ticket=0.50,
+    ),
+]
 
 
 # ── Logging ────────────────────────────────────────────────────────────────────
@@ -405,33 +431,40 @@ def _setup_env() -> None:
         os.environ.setdefault(var, val)
 
 
-def _pick_project() -> tuple[int, Path]:
-    """Return (run_count, project).
+def _pick_project() -> tuple[int, ProjectConfig]:
+    """Return (run_count, project_config).
 
     If BEAT_PROJECT is set, use that path directly (counter still advances).
+    If the path matches a known project, return its config; otherwise build a
+    default-budget ProjectConfig for the override path.
     Otherwise use sequential rotation across PROJECTS.
     """
     count = int(COUNTER_FILE.read_text().strip()) if COUNTER_FILE.exists() else 0
     COUNTER_FILE.write_text(str(count + 1))
     override = os.environ.get("BEAT_PROJECT")
     if override:
-        return count, Path(override).resolve()
+        override_path = Path(override).resolve()
+        for cfg in PROJECTS:
+            if cfg.path == override_path:
+                return count, cfg
+        return count, ProjectConfig(path=override_path)
     idx = count % len(PROJECTS)
     return count, PROJECTS[idx]
 
 
-def _orchestrate(project: Path) -> tuple[str, str | None]:
+def _orchestrate(project: ProjectConfig) -> tuple[str, str | None]:
     """Run the pick→orchestrate sequence; return (outcome, ticket_id)."""
     ticket_id: str | None = None
+    path = project.path
 
     # Housekeeping (conditional)
-    if housekeeping_needed(project):
+    if housekeeping_needed(path):
         _log(f"=== housekeeping: running {_now_iso()} ===")
         hk_rc, _ = run_skill(
             "/housekeeping",
-            budget=BUDGET_HOUSEKEEPING,
+            budget=project.budget_housekeeping,
             timeout_s=HOUSEKEEPING_TIMEOUT_S,
-            cwd=project,
+            cwd=path,
         )
         suffix = "timeout" if hk_rc == TIMEOUT_EXIT_CODE else f"rc={hk_rc}"
         _log(f"=== housekeeping: {suffix if hk_rc != 0 else 'done'} {_now_iso()} ===")
@@ -446,9 +479,9 @@ def _orchestrate(project: Path) -> tuple[str, str | None]:
     _log(f"=== pick-ticket: running {_now_iso()} ===")
     pt_rc, pt_result = run_skill(
         f"/pick-ticket\n\nRunning on: {hostname}",
-        budget=BUDGET_PICK_TICKET,
+        budget=project.budget_pick_ticket,
         timeout_s=PICK_TICKET_TIMEOUT_S,
-        cwd=project,
+        cwd=path,
         project_scoped=True,
     )
 
@@ -475,7 +508,7 @@ def _orchestrate(project: Path) -> tuple[str, str | None]:
         f"/orchestrator {ticket_id}\n\nRunning on: {hostname}",
         budget=BUDGET_ORCHESTRATOR,
         timeout_s=ORCHESTRATOR_TIMEOUT_S,
-        cwd=project,
+        cwd=path,
         project_scoped=True,
     )
 
@@ -508,33 +541,34 @@ def main() -> None:
 
     # Project rotation
     count, project = _pick_project()
-    _state.project = project
+    path = project.path
+    _state.project = path
 
     # Per-project lock: allows concurrent beats on different projects
     _LOCK_DIR.mkdir(parents=True, exist_ok=True)
-    lock_fh = _lockfile(project).open("w")  # held open until process exits
+    lock_fh = _lockfile(path).open("w")  # held open until process exits
     try:
         fcntl.flock(lock_fh, fcntl.LOCK_EX | fcntl.LOCK_NB)
     except BlockingIOError:
-        _log(f"beat already running for {project.name}, skipping.")
+        _log(f"beat already running for {path.name}, skipping.")
         lock_fh.close()
         sys.exit(0)
 
     _log(f"=== beat start {_now_iso()} ===")
-    _log(f"Run {count}  →  project slot {count % len(PROJECTS)}: {project}")
+    _log(f"Run {count}  →  project slot {count % len(PROJECTS)}: {path}")
 
-    if not (project / ".git").is_dir():
-        _log(f"ERROR: {project} is not a git repository. Aborting.")
+    if not (path / ".git").is_dir():
+        _log(f"ERROR: {path} is not a git repository. Aborting.")
         sys.exit(1)
 
-    (project / ".claude" / "sweep-state").mkdir(parents=True, exist_ok=True)
+    (path / ".claude" / "sweep-state").mkdir(parents=True, exist_ok=True)
 
     # Layer-1 cleanup: rewrite buried stale in_progress records that crash
     # recovery missed (it only checks the most-recent record within 55 min).
-    _cleanup_stale_in_progress(project)
+    _cleanup_stale_in_progress(path)
 
     # Crash / SIGKILL recovery
-    last = read_last_beat_record(project)
+    last = read_last_beat_record(path)
     if last and last.get("outcome") == "in_progress":
         try:
             last_at = last.get("last_run_at", "1970-01-01T00:00:00Z")
@@ -543,7 +577,7 @@ def main() -> None:
             ).timestamp()
             if (time.time() - last_epoch) < CRASH_RECOVERY_WINDOW_S:
                 append_beat_log(
-                    project,
+                    path,
                     {
                         "last_run_at": _now_iso(),
                         "ticket_id": None,
@@ -559,7 +593,7 @@ def main() -> None:
             pass
 
     # Spin-in
-    append_beat_log(project, {"outcome": "in_progress", "last_run_at": _now_iso()})
+    append_beat_log(path, {"outcome": "in_progress", "last_run_at": _now_iso()})
 
     # Orchestration
     outcome = "idle"
@@ -572,7 +606,7 @@ def main() -> None:
     # Spin-down
     elapsed = int(time.monotonic() - _state.beat_start)
     finalize_beat_log(
-        project,
+        path,
         {
             "last_run_at": _now_iso(),
             "ticket_id": ticket_id,
@@ -586,7 +620,7 @@ def main() -> None:
     if not DRY_RUN:
         jq_last = subprocess.run(  # noqa: S603
             ["jq", "-cs", "last"],
-            input=_beat_log_path(project).read_text(),
+            input=_beat_log_path(path).read_text(),
             capture_output=True,
             text=True,
             check=False,
