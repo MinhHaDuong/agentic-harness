@@ -47,6 +47,8 @@ Read each ticket + STATE.md. Group by milestone. Identify dependency order and w
 For each ticket, launch an agent (background, no isolation needed — read-only):
 - Read ticket + STATE.md + surrounding code
 - Reimagine: why now, why this scope, what's the simplest path
+- **Antipattern scan (scope).** YAGNI, premature abstraction.
+  Annotate any hits with the proposed fix.
 
 Wait for all. Commit reimagined tickets. Report scorecard.
 
@@ -55,6 +57,8 @@ Wait for all. Commit reimagined tickets. Report scorecard.
 For each reimagined ticket, launch an agent (background):
 - Read ticket + actual source code
 - Write Actions, first test, dependencies
+- **Antipattern scan (execution).** Half-finished work, tautological
+  tests. Annotate any hits with the proposed fix.
 
 Wait for all. Commit planned tickets. Report scorecard.
 
