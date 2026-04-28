@@ -47,17 +47,8 @@ Read each ticket + STATE.md. Group by milestone. Identify dependency order and w
 For each ticket, launch an agent (background, no isolation needed — read-only):
 - Read ticket + STATE.md + surrounding code
 - Reimagine: why now, why this scope, what's the simplest path
-- **Prior-art survey.** If the ticket says implement / build / write a
-  {parser, serializer, client, formatter, scraper, cache, queue, validator,
-  rate-limiter, retry-layer, ...}, search the project's package registry
-  (PyPI for Python, crates.io for Rust, npm for JS, etc.) for the noun.
-  If a maintained library with a compatible license exists, the simplest
-  path is to use it — do not hand-roll. Annotate the reimagined ticket
-  with one of:
-    `Existing libraries considered: <name> <version> (<license>, ✔ adopt) | <other> (✘ <reason>) | ...`
-    `Existing libraries considered: none found in <registry>.`
-  A ticket that mandates hand-rolling something a stable library already
-  does is the YAGNI failure mode this phase exists to catch.
+- **Antipattern scan (scope).** YAGNI, premature abstraction.
+  Annotate any hits with the proposed fix.
 
 Wait for all. Commit reimagined tickets. Report scorecard.
 
@@ -66,11 +57,8 @@ Wait for all. Commit reimagined tickets. Report scorecard.
 For each reimagined ticket, launch an agent (background):
 - Read ticket + actual source code
 - Write Actions, first test, dependencies
-- **YAGNI gate.** If the reimagined ticket lacks an
-  `Existing libraries considered:` line and the ticket verb is
-  implement / build / write, REROLL the imagine phase for that ticket
-  rather than planning. The plan cannot be honest if prior art was
-  not surveyed.
+- **Antipattern scan (execution).** Half-finished work, tautological
+  tests. Annotate any hits with the proposed fix.
 
 Wait for all. Commit planned tickets. Report scorecard.
 
