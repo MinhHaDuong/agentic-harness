@@ -58,10 +58,9 @@ Wait for all. Commit reimagined tickets. Report scorecard.
 For each reimagined ticket, launch an agent (background):
 - Read ticket + actual source code
 - Write Actions, first test, dependencies
-- **Antipattern scan (execution).** Half-finished work (no
-  NotImplementedError, pytest.skip, or TODO), tautological tests
-  (would this test catch a wrong implementation, or only a different
-  one?). Annotate any hits with the proposed fix.
+- **Antipattern scan.** Tautological tests — would this test catch a
+  wrong implementation, or only a different one? Annotate any hits
+  with the proposed fix.
 
 Wait for all. Commit planned tickets. Report scorecard.
 
