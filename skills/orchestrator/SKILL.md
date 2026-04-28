@@ -47,7 +47,8 @@ Read each ticket + STATE.md. Group by milestone. Identify dependency order and w
 For each ticket, launch an agent (background, no isolation needed — read-only):
 - Read ticket + STATE.md + surrounding code
 - Reimagine: why now, why this scope, what's the simplest path
-- **Antipattern scan (scope).** YAGNI, premature abstraction.
+- **Antipattern scan (scope).** YAGNI (search the package registry —
+  don't hand-roll what a library already does), premature abstraction.
   Annotate any hits with the proposed fix.
 
 Wait for all. Commit reimagined tickets. Report scorecard.
