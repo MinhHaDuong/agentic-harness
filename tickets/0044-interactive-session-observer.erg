@@ -1,0 +1,145 @@
+%erg v1
+Title: Interactive-session observer + weekly aggregator
+Status: open
+Created: 2026-04-28
+Author: claude
+Blocked-by: 0042
+
+--- log ---
+2026-04-28T14:20Z claude created
+
+--- body ---
+## Context
+
+IDH's observer surface (pattern B in
+`docs/2026-04-28-metaskill-panorama.md` §1) covers the autonomous
+nightbeat channel via `nightbeat-report` Step 4, but interactive
+sessions produce no structured log of skill friction. `celebrate`
+Step 11 ("Offer to improve workflow rules if lessons were learned")
+is a one-off nudge — it depends on the model deciding to surface
+lessons, doesn't append durably, and has no aggregate review.
+
+Reference: `rebelytics/one-skill-to-rule-them-all` (task-observer)
+implements silent-log-plus-weekly-review. This ticket adapts that
+pattern to IDH's existing telemetry directory and aggregator
+conventions, rather than introducing a parallel pipeline.
+
+Concrete carryover from `docs/2026-04-28-metaskill-panorama.md` §R2.
+
+Blocked by 0042 (replace harness-rules) because part of the observer's
+job is to surface rule-load friction, and the rule-load mechanism
+must be settled first — otherwise observations will be churned by
+the migration itself.
+
+## Relevant files
+
+- `~/.claude/telemetry/celebrations.jsonl` — existing JSONL log,
+  schema model
+- `skills/celebrate/log-celebration` — existing pattern: shell
+  script that appends a JSON line with timestamp prepended
+- `skills/nightbeat-report/SKILL.md` — aggregator-style sibling,
+  reference for the digest section
+- `skills/celebrate/SKILL.md` Step 11 — overlaps; must be
+  reconciled
+- New: `skills/observe/SKILL.md` (or hook entry in
+  `settings.json`)
+- New: `skills/observe-digest/SKILL.md` (or extension of
+  nightbeat-report)
+- New: `~/.claude/telemetry/observations.jsonl`
+
+## Actions
+
+### Part 1 — the observer (logger)
+
+1. Decide: skill (`/observe`) or hook (Stop hook on session end)?
+   - Skill: explicit, user-invocable, no token cost when not invoked.
+   - Hook: deterministic, captures every session, but requires the
+     session metadata to be available in the hook env.
+   - Default choice: hook. Aligns with the deterministic-injection
+     direction set by 0042.
+2. Implement the appender as `scripts/log-observation` (sister of
+   `skills/celebrate/log-celebration`):
+   - Reads JSON from stdin or argv
+   - Prepends `ts` and `date`
+   - Appends to `~/.claude/telemetry/observations.jsonl`
+3. Define the observation schema. Minimum viable:
+   ```json
+   {
+     "session_id": "...",
+     "project": "...",
+     "issue": "free text — what produced friction",
+     "suggested_fix": "free text — concrete proposal",
+     "principle": "free text — generalisable insight"
+   }
+   ```
+   (Schema borrowed from task-observer; "principle" is the field
+   the weekly aggregator clusters on.)
+4. Wire the trigger: at session end, either the Stop hook calls a
+   small Claude invocation that decides whether the session
+   produced an observation worth logging (parallel to celebrate's
+   reflection step but mandatory and structured), or the user
+   invokes `/observe` explicitly when something stings.
+
+### Part 2 — the weekly aggregator
+
+5. New skill `/observations-digest` (or extension of
+   `nightbeat-report` with a `--observations` flag):
+   - Reads the last 7 days of `observations.jsonl`
+   - Clusters by `principle` field
+   - Emits a digest with: cluster count, exemplar issue, proposed
+     harness change
+   - Output format mirrors `nightbeat-report` Step 4
+6. Schedule: systemd timer, weekly. Reuse the cadence from 0043
+   (Sunday morning) so review work batches.
+7. Reconcile with `celebrate` Step 11: drop Step 11, OR keep it as
+   the synchronous opt-in path while the observer captures the
+   silent residue. Decide in the PR.
+
+## Test
+
+Red step: assert observations append correctly and the digest
+clusters them.
+
+- `tests/test_observe.sh`:
+  - Pipe a synthetic JSON observation to `scripts/log-observation`
+  - Assert the line appears in `observations.jsonl` with `ts` and
+    `date` fields populated
+  - Assert no fields from the input are dropped
+- `tests/test_observations_digest.sh`:
+  - Seed `observations.jsonl` with N synthetic entries across 3
+    distinct principles
+  - Run the digest skill
+  - Assert output contains 3 clusters, ordered by frequency
+
+## Verification
+
+- [ ] `observations.jsonl` exists and grows over a week of normal
+      use
+- [ ] Weekly digest fires from systemd timer
+- [ ] Digest output names actionable harness changes (not just
+      "we logged 7 frictions")
+- [ ] `celebrate` Step 11 reconciliation decision documented in
+      the PR (kept / dropped / replaced)
+- [ ] Schema is backward-compatible with task-observer's format
+      so future cross-import is possible
+
+## Invariants
+
+- Observer never modifies skills directly. Output is read-only
+  recommendations. (Inherits the task-observer design constraint.)
+- No PII or client-identifying information in observation entries.
+- The observer itself is observable — the weekly digest must
+  flag its own blind spots, per the
+  "the observer watches itself too" principle.
+- No regression in existing `celebrations.jsonl` flow.
+
+## Exit criteria
+
+- One full week of observations logged from interactive sessions
+  on doudou.
+- One weekly digest reviewed by the user, with at least one
+  proposed change either accepted (a follow-up ticket created) or
+  explicitly rejected.
+- `celebrate` Step 11 status decided.
+- Open question from `docs/2026-04-28-metaskill-panorama.md` §5
+  ("Should `/celebrate` Step 11 be replaced by R2?") closed.

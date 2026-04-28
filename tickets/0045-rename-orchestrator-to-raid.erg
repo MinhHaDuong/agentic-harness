@@ -1,0 +1,151 @@
+%erg v1
+Title: Rename /orchestrator skill to /raid
+Status: open
+Created: 2026-04-28
+Author: claude
+
+--- log ---
+2026-04-28T14:45Z claude created
+
+--- body ---
+## Context
+
+`/orchestrator` is the lifecycle metaskill of IDH (pattern E in
+`docs/2026-04-28-metaskill-panorama.md` §1) but the name is generic
+software jargon. The Imperial Dragon Harness already themes its
+phases as the Five Claws and its single-cycle wrapper as `/beat`.
+A dragon raids — multi-target, autonomous, time-bounded, returns to
+its hoard without merging. The mapping to the skill's actual
+behaviour is exact: pick a wave of tickets, work them in isolated
+worktrees, never merge, return.
+
+Decision: rename `/orchestrator` → `/raid`. `/beat` stays
+(heart/wing-beat — single-cycle pulse, distinct metaphor).
+
+Pair semantics: **beat = one cycle of a heart, raid = one hunt of a
+flight**.
+
+## Relevant files
+
+29 files touch `orchestrator`. Three classes:
+
+**Skill identity (must rename):**
+- `skills/orchestrator/SKILL.md` → `skills/raid/SKILL.md`
+- frontmatter `name: orchestrator` → `name: raid`
+
+**Active consumers — slash invocation or log-label producer:**
+- `scripts/beat.py` line ~508: `/orchestrator <id>` literal invocation
+- `scripts/beat.py` lines ~506, 524: log lines `=== orchestrator: ===`
+- `scripts/nightbeat-report.py` lines ~184, 385: log-label parser
+  matching `orchestrator:` prefix
+- `tests/test_beat.py`: assertions on the above
+
+**Cross-references in skills (rename to /raid):**
+- `skills/beat/SKILL.md`
+- `skills/nightbeat-report/SKILL.md`
+- `skills/verify/SKILL.md`, `verify-adherence/SKILL.md`,
+  `verify-gate/SKILL.md`
+
+**Documentation:**
+- `README.md` (skill tree)
+- `STATE.md` (status section)
+- `docs/20260404-review/03-five-levels.md`
+- `commands/gsd/{audit-milestone,execute-phase,map-codebase,research-phase}.md`
+
+**Historical record — leave as-is:**
+- 14 ticket bodies (`tickets/00*.erg`). Tickets are immutable history.
+  New tickets use `/raid`; closed tickets keep their original prose.
+- Existing `nightbeat.log` lines with `orchestrator:` labels —
+  see "log-label compatibility" below.
+
+## Actions
+
+1. **Plan the parser compatibility window.** The nightbeat log
+   parser in `nightbeat-report.py` reads historical lines with
+   `orchestrator:` prefix. Decision:
+   - **Option A (clean cut):** rotate `nightbeat.log` at rename
+     time, accept that pre-rename history is no longer parseable.
+     Cheap, loses ~25 days of history.
+   - **Option B (dual-accept):** parser accepts both
+     `orchestrator:` and `raid:` for one quarter, then drops
+     `orchestrator:`. Preserves history.
+   - Default: **B**. Cost is ~3 lines of code.
+2. `git mv skills/orchestrator skills/raid`.
+3. Edit `skills/raid/SKILL.md`:
+   - frontmatter `name: orchestrator` → `name: raid`
+   - body self-references
+   - Optional: refresh description from "Run Imperial Dragon batch
+     across multiple tickets" to something that uses "raid".
+     Defer to PR review.
+4. Update `scripts/beat.py`:
+   - Change `/orchestrator <id>` → `/raid <id>` in the prompt
+     literal.
+   - Change log-label producer `=== orchestrator: ===` → `=== raid:
+     ===`.
+5. Update `scripts/nightbeat-report.py`:
+   - Accept both `orchestrator:` and `raid:` prefixes per Option B.
+   - Update `--help` text from "show full orchestrator result text"
+     to "show full raid result text" (or just "result text").
+6. Update `tests/test_beat.py` to match new label format. Add a
+   regression test that asserts the parser still accepts
+   `orchestrator:` labels (compatibility).
+7. Grep-replace `/orchestrator` → `/raid` across the **active**
+   skill bodies (verify*, beat, nightbeat-report). Do NOT touch
+   ticket files.
+8. Update `README.md` skill tree and `STATE.md` status section.
+9. Update `docs/20260404-review/03-five-levels.md` (factual record
+   about the harness — this one may move to "see also: 0045" rather
+   than rename, since it's a snapshot review).
+10. Update `commands/gsd/*` references.
+11. Mention the rename in `docs/2026-04-28-metaskill-panorama.md`
+    §R3 — that section recommends documenting `/orchestrator` as
+    the lifecycle metaskill. With the rename, the recommendation
+    becomes "document `/raid`" — fold the rename in or leave a
+    cross-reference.
+
+## Test
+
+Red step: a structural test that no live skill or active script
+references `/orchestrator` as a slash command after the migration,
+while ticket bodies remain untouched.
+
+- `tests/test_rename_orchestrator_to_raid.sh`:
+  - `! grep -rn "/orchestrator" skills/ scripts/ README.md STATE.md commands/`
+    (zero matches)
+  - `grep -rn "/orchestrator" tickets/ | wc -l` returns ≥ 14
+    (history preserved)
+  - `python3 scripts/nightbeat-report.py` parses a fixture log
+    with mixed `orchestrator:` and `raid:` labels without error
+    (dual-accept compatibility)
+
+## Verification
+
+- [ ] `find skills/orchestrator` returns nothing
+- [ ] `find skills/raid/SKILL.md` exists and validates against
+      skill-lint
+- [ ] `beat.py` produces `=== raid: ===` labels on next run
+- [ ] `nightbeat-report` parses both old and new labels
+- [ ] One full beat cycle on padme runs end-to-end with the new
+      slash command
+- [ ] CI green: `validate-tickets`, `skill-lint`, `leak-guard`,
+      `pipefail-guard`
+
+## Invariants
+
+- Closed tickets are immutable. Their `orchestrator` references
+  stay.
+- Nightbeat log history remains parseable for at least one
+  quarter (Option B).
+- No behaviour change. Pure rename.
+- The `/beat` skill name is preserved.
+
+## Exit criteria
+
+- `/raid` is the canonical name. `/orchestrator` returns "skill not
+  found" or a deprecation pointer.
+- Active scripts, skills, and docs reference `/raid`.
+- Old ticket bodies untouched.
+- Parser dual-accepts both labels with a TODO to drop
+  `orchestrator:` after one quarter (target: 2026-07-28).
+- README structure tree updated.
+- STATE.md updated.

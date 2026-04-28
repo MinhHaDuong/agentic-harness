@@ -1,0 +1,93 @@
+%erg v1
+Title: Run /fewer-permission-prompts weekly via systemd timer
+Status: open
+Created: 2026-04-28
+Author: claude
+
+--- log ---
+2026-04-28T14:10Z claude created
+
+--- body ---
+## Context
+
+`settings.local.json` has accumulated 140 lines of one-off allowlist
+entries (finding C3 in `docs/20260404-review/00-synthesis.md`).
+Anthropic ships an official skill `/fewer-permission-prompts` that
+scans transcript history and emits a recommended allowlist diff
+against `.claude/settings.json`. Manual invocation gets procrastinated;
+a weekly cadence keeps the allowlist tracking actual usage.
+
+Pattern (A) auto-tuner from `docs/2026-04-28-metaskill-panorama.md` §1.
+Concrete carryover from §R1.
+
+Caveat: known bug `anthropics/claude-code#51057` strips env-var
+prefixes during extraction, so commands like
+`TEST_DATABASE_URL=... uv run pytest` are missed. Verify diffs by hand
+before applying.
+
+## Relevant files
+
+- `settings.local.json` — target of the allowlist diff
+- `bin/install-cron` — existing cron/systemd installer pattern
+- `~/.config/systemd/user/claude-nightbeat.timer` — reference timer
+- `scripts/` — likely home of the new runner script
+- `docs/2026-04-28-metaskill-panorama.md` — rationale, §R1
+
+## Actions
+
+1. Write `scripts/fewer-permission-prompts-weekly.sh`:
+   - Spawn a non-interactive Claude Code session
+   - Prompt: invoke `/fewer-permission-prompts` and write the
+     proposed diff to `~/.claude/telemetry/permission-diffs/<date>.diff`
+   - Do NOT auto-apply. Human review only.
+2. Create systemd user unit + timer
+   `~/.config/systemd/user/claude-permissions-prune.{service,timer}`,
+   modelled on `claude-nightbeat.timer`. Cadence: weekly, e.g.
+   Sunday 10:00.
+3. Surface the proposed diff in the morning review:
+   - Extend `nightbeat-report` (or add a small companion line) to
+     check `permission-diffs/` for unreviewed proposals and list
+     them in the daily summary.
+4. One-shot bootstrap: run the script manually once on doudou and
+   on padme to seed the directory.
+5. Document the cadence in README.md (under "permissions") and
+   in the harness CLAUDE.md as a one-line policy.
+
+## Test
+
+Red step: assert the script produces a diff file when run, and that
+the diff is non-destructive.
+
+- `tests/test_permissions_prune.sh`:
+  - Run the script in a sandbox with a synthetic transcript
+    containing repeated permission prompts for `Bash(git status)`.
+  - Assert a diff file is created under `permission-diffs/`.
+  - Assert `settings.local.json` is **unchanged** on disk.
+  - Assert the diff, if applied, is valid JSON.
+
+## Verification
+
+- [ ] `systemctl --user list-timers | grep claude-permissions-prune`
+      shows next-fire ≤ 7 days
+- [ ] `permission-diffs/` directory contains at least one diff file
+      after first run
+- [ ] `settings.local.json` is not modified by the timer
+- [ ] Daily nightbeat summary mentions any unreviewed diff
+- [ ] Known bug #51057 documented in script comment
+
+## Invariants
+
+- No automatic application of diffs. Allowlist changes remain a
+  human decision.
+- Per-host `settings.local.json` files (not the shared
+  `settings.json`) are the only target.
+- `/fewer-permission-prompts` is invoked the same way an interactive
+  user would invoke it — no privileged path.
+
+## Exit criteria
+
+- Weekly timer running on padme and doudou.
+- First diff produced, reviewed, and either applied or rejected
+  (closing the loop on C3).
+- Documentation updated.
+- Bug #51057 caveat noted in the runner script.

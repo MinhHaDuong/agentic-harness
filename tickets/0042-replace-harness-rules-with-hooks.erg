@@ -1,0 +1,106 @@
+%erg v1
+Title: Replace harness-rules skill with context-aware hook injection
+Status: open
+Created: 2026-04-28
+Author: claude
+
+--- log ---
+2026-04-28T14:00Z claude created
+
+--- body ---
+## Context
+
+`skills/harness-rules/` (5 files, 204 lines) is loaded into every session
+via the persuasion phrase "Auto-invoked at session start to establish
+behavioral constraints" in its SKILL.md description. Claude Code has no
+auto-invoke mechanism for skills — that phrase is a probabilistic nudge,
+not a runtime guarantee. The pattern also fights Anthropic's progressive
+disclosure model: the body loads unconditionally, occupying ~1500 tokens
+of every session whether or not the rules apply to the task.
+
+Hooks are the deterministic mechanism for unconditional injection.
+Rules that must always fire belong in hooks, not in a skill description
+that hopes the model reads it.
+
+See `docs/2026-04-28-metaskill-panorama.md` §F4 and the harness-rules
+follow-up exchange for the architectural rationale.
+
+## Relevant files
+
+- `skills/harness-rules/SKILL.md` — the umbrella, to be removed
+- `skills/harness-rules/workflow.md` — unconditional, → hook
+- `skills/harness-rules/git.md` — unconditional, → hook
+- `skills/harness-rules/state.md` — only used by `/end-session`, → fold into that skill
+- `skills/harness-rules/tickets.md` — used by `/new-ticket` + `/ticket-*`, → reference file shared across those skills
+- `skills/harness-rules/coding-python.md` — conditional on Python project, → PreToolUse hook on Edit/Write when `pyproject.toml` exists
+- `scripts/on-start.sh` — SessionStart hook, target for workflow.md + git.md content
+- `settings.json` — register the new PreToolUse hook for coding-python
+
+## Actions
+
+1. Audit each companion file: classify as **unconditional** (every
+   session), **scoped** (only N skills), or **conditional** (project
+   shape). Decision table goes in the PR description.
+2. **Unconditional** rules (workflow.md, git.md) → emit from
+   `on-start.sh` as additional context on session start. Keep the lines
+   above the `exec >/dev/null` cutoff so they actually reach the
+   conversation.
+3. **Scoped** rules (state.md, tickets.md) → move into the bodies (or
+   shared `references/` directory) of the skills that use them.
+   `/end-session` references state.md; `/new-ticket`, `/ticket-new`,
+   `/ticket-claim`, `/ticket-close`, `/ticket-release`, `/ticket-ready`
+   reference tickets.md.
+4. **Conditional** rules (coding-python.md) → register a PreToolUse
+   hook in `settings.json` that injects the file when:
+   - tool is Edit/Write/NotebookEdit, AND
+   - target path matches `*.py`, OR project root has `pyproject.toml`
+5. Delete `skills/harness-rules/` once all consumers are converted.
+6. Update `README.md` (lists harness-rules in the structure tree) and
+   `STATE.md` (mentions auto-invoked rules implicitly).
+
+## Test
+
+Red step: a test that the rules content is reachable when expected and
+absent when not.
+
+- `tests/test_harness_rules_injection.sh`:
+  - Spawn a Claude Code session in a non-Python project. Assert
+    coding-python.md content does **not** appear in the session
+    transcript.
+  - Spawn a session in a Python project (`pyproject.toml` present)
+    and trigger an Edit on a `.py` file. Assert coding-python.md
+    content **does** appear before the edit completes.
+  - Spawn any session. Assert workflow.md and git.md content appears
+    in the SessionStart hook output (verifiable via a fixture session).
+
+## Verification
+
+- [ ] `find skills/harness-rules` returns nothing
+- [ ] `grep -r "harness-rules" skills/ scripts/ settings.json README.md` returns no matches
+- [ ] Non-Python project session does not load coding-python.md
+- [ ] Python project Edit on `.py` triggers coding-python.md injection
+- [ ] `nightbeat-report` for the week after the change shows no spike
+      in rule-violation patterns (baseline comparison)
+- [ ] CI green: `validate-tickets`, `skill-lint`, `leak-guard`,
+      `pipefail-guard`
+
+## Invariants
+
+- The Five Claws workflow phases remain documented somewhere reachable
+  (probably README.md or a single `docs/workflow.md` reference).
+- `/orchestrator`, `/verify`, `/celebrate` continue to read consistent
+  rules (they currently inherit from harness-rules being always loaded;
+  they may need explicit references after the change).
+- No behavioral regression on the autonomous nightbeat channel — the
+  weekly comparison above gates this.
+
+## Exit criteria
+
+- `skills/harness-rules/` removed.
+- Rules previously in companion files are injected by hooks (always)
+  or referenced explicitly by the skills that need them (scoped).
+- One week of nightbeat runs after merge shows no rule-adherence
+  regression vs. the prior week.
+- Token budget per session reduced by the size of harness-rules
+  bodies on tasks that don't need them (measurable via session-end
+  token counts in telemetry).
