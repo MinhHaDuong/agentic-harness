@@ -13,7 +13,7 @@ Author: claude
 `beat.py` and orchestrator sessions currently mutate `.erg` ticket files
 via direct `Edit`/`Write`/`Bash` tool calls. This hits the Claude Code
 permission layer, which has been observed to deny these operations even
-under `--permission-mode bypassPermissions` (see ticket 0050).
+under `--permission-mode bypassPermissions` (see ticket 0052).
 
 The root fix is to route all `.erg` mutations through the `erg` Go binary
 (e.g., `erg close <id>`, `erg log <id> <entry>`), which runs as a plain
@@ -39,7 +39,7 @@ unblock this ticket when those commands land.
    ticket_id], ...)` or via a helper wrapper).
 
 3. Remove the belt-and-suspenders allow-list entries in `beat-settings.json`
-   added by ticket 0050, if they were only needed as a workaround.
+   added by ticket 0052, if they were only needed as a workaround.
 
 4. Update `test_beat.py` to mock `subprocess.run(["erg", ...])` calls
    rather than file-write operations.

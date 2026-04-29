@@ -39,7 +39,8 @@ Level 4 (Hooks) + orchestrator + `/verify` loop + git-erg tickets + bibliography
 - 0045 — rename /orchestrator to /raid
 - 0046 — extract flying-projects list into projects.json
 - 0047 — auto early context compaction in beat and raid
-- 0053 — rewrite README with Imperial Dragon voice (remove GSD, new opener)
+- 0057 — route .erg mutations through erg binary (blocked by erg binary exposing mutation commands)
+- 0058 — rewrite README with Imperial Dragon voice (remove GSD, new opener)
 - 0054 — [discussion] restore Five-Claws phase announcement at session start
 - 0055 — [discussion] milestone/epic layer above tickets
 - 0056 — [discussion] mid-session pause/resume checkpoints
