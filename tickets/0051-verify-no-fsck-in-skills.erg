@@ -1,0 +1,25 @@
+%erg v1
+Title: Verify git fsck --unreachable absent from all skill files
+Status: open
+Created: 2026-04-29
+Author: claude
+
+--- log ---
+2026-04-29T11:00Z claude created
+
+--- body ---
+## Context
+
+Ticket 0039 was opened to remove `git fsck --unreachable` from housekeeping.
+It was closed as already-done. This ticket is a follow-up verification pass
+to confirm no other skill files have reintroduced the call.
+
+## Actions
+
+1. Run: `grep -r "fsck" ~/.claude/skills/`
+2. If any matches: remove them and document why.
+3. If no matches: close this ticket as already-done.
+
+## Exit criteria
+
+- `grep -r "fsck" ~/.claude/skills/` returns no output
