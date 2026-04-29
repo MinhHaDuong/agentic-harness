@@ -1,6 +1,6 @@
 %erg v1
 Title: Rename /orchestrator skill to /raid
-Status: doing
+Status: closed
 Created: 2026-04-28
 Author: claude
 
@@ -10,6 +10,9 @@ Author: claude
 2026-04-29T15:27Z claude note repaired body corruption from erg sweep-skip bug (see follow-up ticket)
 2026-04-29T15:27Z claude claimed
 2026-04-29T15:27Z claude status doing starting-implementation
+2026-04-29T15:50Z claude note skill renamed, scripts updated, parser dual-accepts, snapshot docs annotated, 85 pytest + structural test pass
+2026-04-29T15:50Z claude note commands/gsd/* left untouched — those use "orchestrator" generically for the GSD command's own role, not IDH's metaskill
+2026-04-29T15:50Z claude status closed implementation-done
 
 --- body ---
 ## Context

@@ -3,6 +3,10 @@
 **Date:** 2026-04-04
 **Reviewer:** Opus agent (level-by-level audit)
 
+> **Reader note (2026-04-29):** Any IDH skill named `/orchestrator`
+> below predates the rename to `/raid` (ticket 0045). Generic uses
+> of "orchestrator" (e.g. fleet manager) are unchanged.
+
 ---
 
 ## Level-by-Level Audit

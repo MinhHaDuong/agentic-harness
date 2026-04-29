@@ -4,6 +4,11 @@
 **Scope:** Thematic supplement to the 2026-04-04 review. Looks at what people in the Claude Code ecosystem mean when they say "metaskill" and what that lens reveals about IDH.
 **Companion to:** [`20260404-review/00-synthesis.md`](20260404-review/00-synthesis.md). The earlier review covered hooks, settings hygiene, verification, and review personas. This report does not redo that work; it adds a single dimension the earlier sweep did not isolate.
 
+> **Reader note (2026-04-29):** Every reference to `/orchestrator`
+> below predates the rename to `/raid` (ticket 0045). The skill,
+> recommendation R3, and the lifecycle-metaskill claim all still
+> apply — only the slash command has changed.
+
 ---
 
 ## Résumé (FR)

@@ -1,0 +1,90 @@
+%erg v1
+Title: erg sweep-skip corrupts ticket bodies via slice aliasing
+Status: open
+Created: 2026-04-29
+Author: claude
+
+--- log ---
+2026-04-29T15:55Z claude created
+
+--- body ---
+## Context
+
+While repairing ticket 0045's corrupted body, the underlying cause
+was traced to a Go slice-aliasing bug in `cmdSweepSkip` at
+`tickets/tools/go/main.go:1259-1316`.
+
+The function reads the file with `os.ReadFile` (which returns a
+slice with `cap > len`), takes a sub-slice `beforeBody := raw[:idx]`
+that shares the backing array, then `append`s the new log line into
+`beforeBody`. Because `cap(beforeBody) == cap(raw) > idx`, `append`
+mutates `raw[idx:]` in place — overwriting the `--- body ---`
+separator and the first ~90 bytes of the body. The subsequent
+`append(result, raw[idx+len(sep):]...)` then reads back the corrupted
+bytes.
+
+Visible symptom: the written ticket has a duplicated `--- body ---`
+separator and a truncated/garbled log line at the start of the body
+(e.g. line beginning `:18Z claude note sweep-skip…`).
+
+The validator does not reject duplicate separators (rule 11 only
+asserts presence, not uniqueness), so the corruption ships.
+
+## Affected tickets
+
+Nine tickets currently in `tickets/` carry the corruption pattern
+(grep'd as files with two or more `^--- body ---$` lines):
+
+- 0013 bib-to-zotero-skill
+- 0028 multiproject-beat-dashboard
+- 0034 housekeeping-split-git-and-ticket-phases
+- 0042 replace-harness-rules-with-hooks
+- 0043 weekly-fewer-permission-prompts
+- 0045 rename-orchestrator-to-raid (already repaired manually)
+- 0047 early-context-compaction-beat-raid
+- 0049 truth-in-ticket-open-status
+- 0051 beat-idle-project-fallback
+
+## Actions
+
+1. Fix `cmdSweepSkip` so it does not alias `raw`. Two viable
+   options:
+   - Replace `beforeBody := raw[:idx]` with
+     `beforeBody := append([]byte(nil), raw[:idx]...)` (explicit
+     copy), or
+   - Build the result with `bytes.Buffer.Write` calls.
+   The same pattern needs auditing in `cmdSweepWrite` and
+   `appendToTicket`.
+2. Add a Go test that round-trips a ticket through `sweep-skip`
+   and asserts the body is unchanged.
+3. Strengthen the validator: reject more than one `--- body ---`
+   separator (rule 11 extension) so any future regression is
+   caught at commit time.
+4. Repair the eight remaining corrupted tickets by reading their
+   pre-corruption versions from git history (each ticket's last
+   non-sweep-skip commit) and re-applying the legitimate
+   sweep-skip log line by hand.
+5. Re-run the validator across `tickets/` and `tickets/archive/`
+   to confirm zero residual corruption.
+
+## Test
+
+Red step: `tickets/tools/go/main_test.go` — write a ticket file
+with a known body, call `cmdSweepSkip` directly, re-read the file,
+assert the body matches the original byte-for-byte and there is
+exactly one `--- body ---` separator.
+
+## Exit criteria
+
+- `cmdSweepSkip` (and any other site sharing the bug) does not
+  mutate input slices.
+- A Go-level regression test exists.
+- The validator rejects duplicate body separators.
+- All eight remaining corrupted tickets are repaired and pass
+  validation.
+
+## Out of scope
+
+- Auditing nightbeat.log for any garbled log lines that may have
+  been emitted by the same bug — log lines are append-only and the
+  observed corruption is in body content.

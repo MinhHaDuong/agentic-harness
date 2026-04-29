@@ -36,11 +36,11 @@ Level 4 (Hooks) + raid + `/verify` loop + git-erg tickets + bibliography pipelin
 - 0042 — replace harness-rules with hooks (metaskill panorama finding)
 - 0043 — weekly /fewer-permission-prompts run
 - 0044 — interactive session observer
-- 0045 — rename /orchestrator to /raid
 - 0046 — extract flying-projects list into projects.json
 - 0047 — auto early context compaction in beat and raid
 - 0057 — route .erg mutations through erg binary (blocked by erg binary exposing mutation commands)
 - 0058 — rewrite README with Imperial Dragon voice (remove GSD, new opener)
+- 0060 — fix erg sweep-skip slice-aliasing bug + repair 8 corrupted tickets
 - 0054 — [discussion] restore Five-Claws phase announcement at session start
 - 0055 — [discussion] milestone/epic layer above tickets
 - 0056 — [discussion] mid-session pause/resume checkpoints
