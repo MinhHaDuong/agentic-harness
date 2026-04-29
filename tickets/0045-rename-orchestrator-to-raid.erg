@@ -7,11 +7,11 @@ Author: claude
 --- log ---
 2026-04-28T14:45Z claude created
 
+2026-04-29T09:18Z claude note sweep-skip: scope-too-large hash:b9aa130954c4 expires:2026-04-30T09:18Z
 --- body ---
-## Context
-
-`/orchestrator` is the lifecycle metaskill of IDH (pattern E in
-`docs/2026-04-28-metaskill-panorama.md` §1) but the name is generic
+:18Z claude note sweep-skip: scope-too-large hash:b9aa130954c4 expires:2026-04-30T09:18Z
+--- body ---
+-panorama.md` §1) but the name is generic
 software jargon. The Imperial Dragon Harness already themes its
 phases as the Five Claws and its single-cycle wrapper as `/beat`.
 A dragon raids — multi-target, autonomous, time-bounded, returns to

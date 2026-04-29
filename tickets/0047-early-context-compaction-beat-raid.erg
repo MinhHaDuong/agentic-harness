@@ -7,11 +7,11 @@ Author: claude
 --- log ---
 2026-04-29T08:00Z claude created
 
+2026-04-29T09:18Z claude note sweep-skip: scope-too-large hash:567998f68005 expires:2026-04-30T09:18Z
 --- body ---
-## Context
-
-Long-running workflows — `beat` (nightbeat) and `raid` (/orchestrator, soon /raid) —
-spawn multiple Claude sub-sessions. Each sub-session can accumulate substantial context
+:18Z claude note sweep-skip: scope-too-large hash:567998f68005 expires:2026-04-30T09:18Z
+--- body ---
+pawn multiple Claude sub-sessions. Each sub-session can accumulate substantial context
 before automatic compaction kicks in, wasting token budget re-reading stale tool output.
 
 Ticket 0041 investigated whether the problem exists in `beat.py`. The answer is yes:

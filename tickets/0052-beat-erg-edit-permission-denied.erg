@@ -7,6 +7,7 @@ Author: claude
 --- log ---
 2026-04-29T09:30Z claude created
 
+2026-04-29T09:18Z claude note sweep-assess: not-picked hash:0f1f9c454cfc scope:add explicit allows to beat-settings.json risk:low
 --- body ---
 ## Context
 
@@ -63,3 +64,8 @@ and commit succeed and no `permission_denials` appear in the log.
   `.claude` project ticket-close operations
 - Behavior confirmed stable across at least 14 consecutive days of beats
   (check: zero denials in `nightbeat-report --hours 336`)
+## Picker assessment 2026-04-29T09:18Z
+**Decision:** not-picked
+**Scope:** add explicit allows to beat-settings.json
+**Risk:** low
+**Reason:** small fix but 2-week stability window before close; 0051 preferred as fully closeable this beat

@@ -10,8 +10,9 @@ Author: user
 2026-04-27T21:04Z claude note sweep-skip: scope-too-large hash:5337b9e78984 expires:2026-04-28T14:32Z
 2026-04-28T21:03Z claude note sweep-skip: scope-too-large hash:4680d9afb7d9 expires:2026-04-29T21:03Z
 2026-04-29T02:05Z claude note sweep-skip: scope-too-large hash:eb7beb6f93fa expires:2026-04-30T02:05Z
+2026-04-29T09:18Z claude note sweep-skip: scope-too-large hash:f6250604695b expires:2026-04-30T09:18Z
 --- body ---
-:05Z claude note sweep-skip: scope-too-large hash:eb7beb6f93fa expires:2026-04-30T02:05Z
+:18Z claude note sweep-skip: scope-too-large hash:f6250604695b expires:2026-04-30T09:18Z
 --- body ---
 ib is staging. The canonical library is Zotero. Today the last step
 (refs.bib → Zotero) is manual (File → Import). This ticket automates it.

@@ -7,11 +7,11 @@ Author: claude
 --- log ---
 2026-04-29T09:00Z claude created
 
+2026-04-29T09:18Z claude note sweep-skip: scope-too-large hash:a817bfe3a1a2 expires:2026-04-30T09:18Z
 --- body ---
-## Context
-
-The beat pipeline assumes `Status: open` means the work is not yet done.
-This invariant breaks when a ticket's acceptance criteria are already met
+:18Z claude note sweep-skip: scope-too-large hash:a817bfe3a1a2 expires:2026-04-30T09:18Z
+--- body ---
+eaks when a ticket's acceptance criteria are already met
 in the codebase — either because the work was done as a side effect of
 another ticket, or because the ticket described a condition that never
 existed (e.g., 0039: `git fsck --unreachable` was already absent).

@@ -6,6 +6,7 @@ Author: claude
 
 --- log ---
 2026-04-27T09:00Z claude created
+2026-04-29T12:30Z claude bump verify-reroll — round 1: log entries misplaced in body section (0037 + 0046); manual test gap for cooldown-recent-pick guard A
 
 2026-04-27T21:04Z claude note sweep-assess: not-picked hash:a0c7372a77a9 scope:add cooldown guard in pick-ticket skill and warning in beat.py risk:medium
 2026-04-29T08:11Z claude status closed — cooldown-recent-pick guard in pick-ticket skill (A) + done-but-open warning in beat.py (B)
