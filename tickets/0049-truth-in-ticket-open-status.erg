@@ -9,10 +9,12 @@ Author: claude
 
 2026-04-29T09:18Z claude note sweep-skip: scope-too-large hash:a817bfe3a1a2 expires:2026-04-30T09:18Z
 2026-04-29T09:25Z claude note sweep-skip: scope-too-large hash:1141174ff292 expires:2026-04-30T09:21Z
+2026-04-29T18:55Z claude note repaired body corruption from erg sweep-skip bug (ticket 0060)
 --- body ---
-:25Z claude note sweep-skip: scope-too-large hash:1141174ff292 expires:2026-04-30T09:21Z
---- body ---
-eaks when a ticket's acceptance criteria are already met
+## Context
+
+The beat pipeline assumes `Status: open` means the work is not yet done.
+This invariant breaks when a ticket's acceptance criteria are already met
 in the codebase — either because the work was done as a side effect of
 another ticket, or because the ticket described a condition that never
 existed (e.g., 0039: `git fsck --unreachable` was already absent).

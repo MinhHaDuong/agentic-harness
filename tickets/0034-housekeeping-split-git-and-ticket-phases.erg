@@ -12,10 +12,12 @@ Author: claude
 2026-04-29T02:05Z claude note sweep-skip: scope-too-large hash:8632df653b14 expires:2026-04-30T02:05Z
 2026-04-29T09:18Z claude note sweep-skip: scope-too-large hash:8895985d7704 expires:2026-04-30T09:18Z
 2026-04-29T09:25Z claude note sweep-skip: scope-too-large hash:fd5819165802 expires:2026-04-30T09:21Z
+2026-04-29T18:55Z claude note repaired body corruption from erg sweep-skip bug (ticket 0060)
 --- body ---
-:25Z claude note sweep-skip: scope-too-large hash:fd5819165802 expires:2026-04-30T09:21Z
---- body ---
-ktrees, STATE.md, commit
+## Problem
+
+Housekeeping does two expensive things in one session:
+1. Git hygiene: stale branches, worktrees, STATE.md, commit
 2. Ticket scan: sweep-skip expiry, pick-assessments
 
 Combining them in a single long session (30–41 turns, $0.50+) means a budget

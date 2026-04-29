@@ -9,10 +9,12 @@ Author: claude
 
 2026-04-29T09:18Z claude note sweep-skip: scope-too-large hash:7aedbe92df8c expires:2026-04-30T09:18Z
 2026-04-29T09:25Z claude note sweep-skip: scope-too-large hash:edaeb529c775 expires:2026-04-30T09:21Z
+2026-04-29T18:55Z claude note repaired body corruption from erg sweep-skip bug (ticket 0060)
 --- body ---
-:25Z claude note sweep-skip: scope-too-large hash:edaeb529c775 expires:2026-04-30T09:21Z
---- body ---
-on phrase "Auto-invoked at session start to establish
+## Context
+
+`skills/harness-rules/` (5 files, 204 lines) is loaded into every session
+via the persuasion phrase "Auto-invoked at session start to establish
 behavioral constraints" in its SKILL.md description. Claude Code has no
 auto-invoke mechanism for skills — that phrase is a probabilistic nudge,
 not a runtime guarantee. The pattern also fights Anthropic's progressive

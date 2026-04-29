@@ -9,10 +9,12 @@ Author: claude
 
 2026-04-29T09:18Z claude note sweep-skip: scope-too-large hash:c3bfb0ede8f9 expires:2026-04-30T09:18Z
 2026-04-29T09:25Z claude note sweep-skip: scope-too-large hash:9f5957e07f6c expires:2026-04-30T09:21Z
+2026-04-29T18:55Z claude note repaired body corruption from erg sweep-skip bug (ticket 0060)
 --- body ---
-:25Z claude note sweep-skip: scope-too-large hash:9f5957e07f6c expires:2026-04-30T09:21Z
---- body ---
-n `docs/20260404-review/00-synthesis.md`).
+## Context
+
+`settings.local.json` has accumulated 140 lines of one-off allowlist
+entries (finding C3 in `docs/20260404-review/00-synthesis.md`).
 Anthropic ships an official skill `/fewer-permission-prompts` that
 scans transcript history and emits a recommended allowlist diff
 against `.claude/settings.json`. Manual invocation gets procrastinated;

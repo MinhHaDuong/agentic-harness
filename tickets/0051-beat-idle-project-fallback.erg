@@ -10,10 +10,12 @@ Author: claude
 
 2026-04-29T09:18Z claude note sweep-skip: scope-too-large hash:aff71a026b83 expires:2026-04-30T09:18Z
 2026-04-29T09:25Z claude note sweep-skip: scope-too-large hash:3cb6ec4ca46b expires:2026-04-30T09:21Z
+2026-04-29T18:55Z claude note repaired body corruption from erg sweep-skip bug (ticket 0060)
 --- body ---
-:25Z claude note sweep-skip: scope-too-large hash:3cb6ec4ca46b expires:2026-04-30T09:21Z
---- body ---
-ps. The timeslot is wasted. Meanwhile other
+## Context
+
+When `pick-ticket` returns IDLE for the selected project, beat logs
+`outcome=idle` and stops. The timeslot is wasted. Meanwhile other
 projects in the rotation may have eligible tickets.
 
 Similarly, `housekeeping_needed()` already short-circuits on frozen
