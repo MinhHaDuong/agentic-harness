@@ -8,11 +8,11 @@ Author: claude
 2026-04-29T11:00Z claude created
 
 2026-04-29T09:18Z claude note sweep-pick: picked hash:3c2bc92b2f84 scope:grep skills/ for fsck, remove if found risk:very-low
+2026-04-29T09:25Z claude note sweep-skip: cooldown-recent-pick hash:3c2bc92b2f84 expires:2026-04-29T17:18Z
 --- body ---
-## Context
-
-Ticket 0039 was opened to remove `git fsck --unreachable` from housekeeping.
-It was closed as already-done. This ticket is a follow-up verification pass
+:25Z claude note sweep-skip: cooldown-recent-pick hash:3c2bc92b2f84 expires:2026-04-29T17:18Z
+--- body ---
+lready-done. This ticket is a follow-up verification pass
 to confirm no other skill files have reintroduced the call.
 
 ## Actions

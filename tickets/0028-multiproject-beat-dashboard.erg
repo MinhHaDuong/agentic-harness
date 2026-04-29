@@ -12,8 +12,9 @@ Author: claude
 2026-04-28T21:03Z claude note sweep-skip: scope-too-large hash:421b67c9bde1 expires:2026-04-29T21:03Z
 2026-04-29T02:05Z claude note sweep-skip: scope-too-large hash:eb412fd8aec8 expires:2026-04-30T02:05Z
 2026-04-29T09:18Z claude note sweep-skip: scope-too-large hash:b6e8921ac8c1 expires:2026-04-30T09:18Z
+2026-04-29T09:25Z claude note sweep-skip: scope-too-large hash:18e6d4e648d8 expires:2026-04-30T09:21Z
 --- body ---
-:18Z claude note sweep-skip: scope-too-large hash:b6e8921ac8c1 expires:2026-04-30T09:18Z
+:25Z claude note sweep-skip: scope-too-large hash:18e6d4e648d8 expires:2026-04-30T09:21Z
 --- body ---
 nel
 (stdlib-only, 496 lines). Two weaknesses to fix:

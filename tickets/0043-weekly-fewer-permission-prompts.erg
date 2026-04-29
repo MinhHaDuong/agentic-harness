@@ -8,8 +8,9 @@ Author: claude
 2026-04-28T14:10Z claude created
 
 2026-04-29T09:18Z claude note sweep-skip: scope-too-large hash:c3bfb0ede8f9 expires:2026-04-30T09:18Z
+2026-04-29T09:25Z claude note sweep-skip: scope-too-large hash:9f5957e07f6c expires:2026-04-30T09:21Z
 --- body ---
-:18Z claude note sweep-skip: scope-too-large hash:c3bfb0ede8f9 expires:2026-04-30T09:18Z
+:25Z claude note sweep-skip: scope-too-large hash:9f5957e07f6c expires:2026-04-30T09:21Z
 --- body ---
 n `docs/20260404-review/00-synthesis.md`).
 Anthropic ships an official skill `/fewer-permission-prompts` that
