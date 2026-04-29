@@ -9,9 +9,7 @@ argument-hint:
 
 ## Steps
 
-1. **Ground in git.** One Bash call: `git log --oneline --since="6am"; echo "---"; git status --short`. Name dirty files if any — do not diff them.
-
-2. **Report: Done.** What is concretely finished in this conversation:
+1. **Report: Done.** What is concretely finished in this conversation:
    - Files written or edited.
    - Commits and PRs merged.
    - Tickets closed.
