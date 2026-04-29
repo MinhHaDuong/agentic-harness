@@ -124,7 +124,10 @@ class TestHousekeepingNeeded:
     def test_safety_floor_always_runs(self, tmp_project):
         very_old = f"{int(time.time()) - 25 * 3600} {self._SHA}"
         with patch("beat.subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(stdout=very_old + "\n", returncode=0)
+            mock_run.side_effect = [
+                MagicMock(stdout=very_old + "\n", returncode=0),  # last hk commit
+                MagicMock(stdout="abc1234 recent work\n", returncode=0),  # not frozen
+            ]
             assert beat.housekeeping_needed(tmp_project) is True
 
     def test_corrupted_timestamp_returns_true(self, tmp_project):
@@ -387,7 +390,15 @@ class TestOrchestrate:
     def _patch_run_skill(self, responses: dict):
         """responses: {skill_substr: (rc, result)}"""
 
-        def fake_run_skill(skill, *, budget, timeout_s, cwd, project_scoped=False):
+        def fake_run_skill(
+            skill,
+            *,
+            budget,
+            timeout_s,
+            cwd,
+            project_scoped=False,
+            model=beat.MODEL_SONNET,
+        ):
             for key, val in responses.items():
                 if key in skill:
                     return val
@@ -521,7 +532,15 @@ class TestProjectScopedIsolation:
     def test_orchestrate_passes_project_scoped_to_pick_ticket(self, tmp_project):
         recorded: list[dict] = []
 
-        def fake_run_skill(skill, *, budget, timeout_s, cwd, project_scoped=False):
+        def fake_run_skill(
+            skill,
+            *,
+            budget,
+            timeout_s,
+            cwd,
+            project_scoped=False,
+            model=beat.MODEL_SONNET,
+        ):
             recorded.append({"skill": skill, "project_scoped": project_scoped})
             return (0, "IDLE: empty")
 
@@ -537,7 +556,15 @@ class TestProjectScopedIsolation:
     def test_orchestrate_passes_project_scoped_to_orchestrator(self, tmp_project):
         recorded: list[dict] = []
 
-        def fake_run_skill(skill, *, budget, timeout_s, cwd, project_scoped=False):
+        def fake_run_skill(
+            skill,
+            *,
+            budget,
+            timeout_s,
+            cwd,
+            project_scoped=False,
+            model=beat.MODEL_SONNET,
+        ):
             recorded.append({"skill": skill, "project_scoped": project_scoped})
             if "pick-ticket" in skill:
                 return (0, "PICK: 0001")
@@ -555,7 +582,15 @@ class TestProjectScopedIsolation:
     def test_orchestrate_does_not_scope_housekeeping(self, tmp_project):
         recorded: list[dict] = []
 
-        def fake_run_skill(skill, *, budget, timeout_s, cwd, project_scoped=False):
+        def fake_run_skill(
+            skill,
+            *,
+            budget,
+            timeout_s,
+            cwd,
+            project_scoped=False,
+            model=beat.MODEL_SONNET,
+        ):
             recorded.append({"skill": skill, "project_scoped": project_scoped})
             return (0, "IDLE: empty")
 
@@ -593,7 +628,10 @@ class TestPerProjectLock:
             patch("beat.signal.signal"),
             patch("beat._setup_env"),
             patch.object(beat, "LOGDIR", tmp_path / "logs"),
-            patch("beat._pick_project", return_value=(0, beat.ProjectConfig(path=tmp_project))),
+            patch(
+                "beat._pick_project",
+                return_value=(0, beat.ProjectConfig(path=tmp_project)),
+            ),
             patch.object(beat, "_LOCK_DIR", fake_lock_dir),
             patch("beat.fcntl.flock", side_effect=BlockingIOError),
             pytest.raises(SystemExit) as exc_info,
@@ -686,3 +724,144 @@ class TestSpinDown:
             )
         last_line = beat_log.read_text().splitlines()[-1]
         assert json.loads(last_line)["outcome"] == "idle"
+
+
+# ── _repo_active (ticket 0038) ─────────────────────────────────────────────────
+
+
+class TestRepoActive:
+    def test_active_with_commits(self, tmp_project):
+        with patch("beat.subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(
+                stdout="abc1234 some commit\n", returncode=0
+            )
+            assert beat._repo_active(tmp_project) is True
+
+    def test_idle_no_commits(self, tmp_project):
+        with patch("beat.subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(stdout="", returncode=0)
+            assert beat._repo_active(tmp_project) is False
+
+    def test_git_error_treated_as_idle(self, tmp_project):
+        with patch("beat.subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(stdout="", returncode=128)
+            assert beat._repo_active(tmp_project) is False
+
+
+# ── pick-ticket model selection (ticket 0038) ──────────────────────────────────
+
+
+class TestPickTicketModelSelection:
+    def setup_method(self):
+        beat.DRY_RUN = False
+
+    def _make_recorder(self):
+        recorded: list[dict] = []
+
+        def fake_run_skill(
+            skill,
+            *,
+            budget,
+            timeout_s,
+            cwd,
+            project_scoped=False,
+            model=beat.MODEL_SONNET,
+        ):
+            recorded.append({"skill": skill, "model": model})
+            return (0, "IDLE: empty")
+
+        return recorded, fake_run_skill
+
+    def test_uses_haiku_when_idle(self, tmp_project):
+        recorded, fake = self._make_recorder()
+        with (
+            patch("beat.housekeeping_needed", return_value=False),
+            patch("beat._repo_active", return_value=False),
+            patch("beat.run_skill", side_effect=fake),
+        ):
+            beat._orchestrate(beat.ProjectConfig(path=tmp_project))
+        pick_call = next(r for r in recorded if "pick-ticket" in r["skill"])
+        assert pick_call["model"] == beat.MODEL_HAIKU
+
+    def test_uses_sonnet_when_active(self, tmp_project):
+        recorded, fake = self._make_recorder()
+        with (
+            patch("beat.housekeeping_needed", return_value=False),
+            patch("beat._repo_active", return_value=True),
+            patch("beat.run_skill", side_effect=fake),
+        ):
+            beat._orchestrate(beat.ProjectConfig(path=tmp_project))
+        pick_call = next(r for r in recorded if "pick-ticket" in r["skill"])
+        assert pick_call["model"] == beat.MODEL_SONNET
+
+    def test_project_override_respected_when_idle(self, tmp_project):
+        custom_model = "claude-opus-4-7"
+        recorded, fake = self._make_recorder()
+        with (
+            patch("beat.housekeeping_needed", return_value=False),
+            patch("beat._repo_active", return_value=False),
+            patch("beat.run_skill", side_effect=fake),
+        ):
+            beat._orchestrate(
+                beat.ProjectConfig(path=tmp_project, pick_ticket_model=custom_model)
+            )
+        pick_call = next(r for r in recorded if "pick-ticket" in r["skill"])
+        assert pick_call["model"] == custom_model
+
+    def test_project_override_ignored_when_active(self, tmp_project):
+        """When repo is active, Sonnet is always used regardless of pick_ticket_model."""
+        recorded, fake = self._make_recorder()
+        with (
+            patch("beat.housekeeping_needed", return_value=False),
+            patch("beat._repo_active", return_value=True),
+            patch("beat.run_skill", side_effect=fake),
+        ):
+            beat._orchestrate(
+                beat.ProjectConfig(
+                    path=tmp_project, pick_ticket_model="claude-opus-4-7"
+                )
+            )
+        pick_call = next(r for r in recorded if "pick-ticket" in r["skill"])
+        assert pick_call["model"] == beat.MODEL_SONNET
+
+
+# ── _repo_frozen_since / housekeeping frozen skip (ticket 0040) ────────────────
+
+
+class TestRepoFrozenSince:
+    def _dt(self, hours_ago: int):
+        from datetime import datetime, timezone
+
+        return datetime.fromtimestamp(time.time() - hours_ago * 3600, tz=timezone.utc)
+
+    def test_frozen_when_no_commits(self, tmp_project):
+        with patch("beat.subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(stdout="", returncode=0)
+            assert beat._repo_frozen_since(tmp_project, self._dt(25)) is True
+
+    def test_not_frozen_when_commits_present(self, tmp_project):
+        with patch("beat.subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(stdout="abc1234 a commit\n", returncode=0)
+            assert beat._repo_frozen_since(tmp_project, self._dt(25)) is False
+
+
+class TestHousekeepingFrozenSkip:
+    _SHA = "abc1234567890abcdef1234567890abcdef123456"
+
+    def test_frozen_repo_skips_housekeeping(self, tmp_project):
+        very_old = f"{int(time.time()) - 25 * 3600} {self._SHA}"
+        with patch("beat.subprocess.run") as mock_run:
+            mock_run.side_effect = [
+                MagicMock(stdout=very_old + "\n", returncode=0),  # last hk commit
+                MagicMock(stdout="", returncode=0),  # frozen check: no commits
+            ]
+            assert beat.housekeeping_needed(tmp_project) is False
+
+    def test_active_repo_past_floor_runs_housekeeping(self, tmp_project):
+        very_old = f"{int(time.time()) - 25 * 3600} {self._SHA}"
+        with patch("beat.subprocess.run") as mock_run:
+            mock_run.side_effect = [
+                MagicMock(stdout=very_old + "\n", returncode=0),  # last hk commit
+                MagicMock(stdout="abc1234 recent work\n", returncode=0),  # not frozen
+            ]
+            assert beat.housekeeping_needed(tmp_project) is True

@@ -52,6 +52,9 @@ BUDGET_HOUSEKEEPING: float = 0.75
 BUDGET_PICK_TICKET: float = 0.75
 BUDGET_ORCHESTRATOR: float = 5.00
 
+MODEL_SONNET: str = "sonnet"
+MODEL_HAIKU: str = "claude-haiku-4-5-20251001"
+
 DRY_RUN: bool = os.environ.get("BEAT_DRY_RUN") == "1"
 
 
@@ -80,6 +83,7 @@ class ProjectConfig:
     path: Path
     budget_housekeeping: float = BUDGET_HOUSEKEEPING
     budget_pick_ticket: float = BUDGET_PICK_TICKET
+    pick_ticket_model: str = MODEL_HAIKU  # model used when repo has no recent commits
 
 
 PROJECTS: list[ProjectConfig] = [
@@ -282,6 +286,9 @@ def housekeeping_needed(project: Path) -> bool:
     if age <= HOUSEKEEPING_INTERVAL_S:
         return False
     if age > HOUSEKEEPING_SAFETY_FLOOR_S:
+        last_hk_dt = datetime.fromtimestamp(int(parts[0]), tz=timezone.utc)
+        if _repo_frozen_since(project, last_hk_dt):
+            return False
         return True
     # Between interval and safety floor: run only if repo has activity.
     activity = subprocess.run(  # noqa: S603
@@ -295,6 +302,30 @@ def housekeeping_needed(project: Path) -> bool:
         return int(activity.stdout.strip()) > 0
     except ValueError:
         return True
+
+
+def _repo_frozen_since(project: Path, since: datetime) -> bool:
+    """Return True when no commits have landed since `since`."""
+    result = subprocess.run(  # noqa: S603
+        ["git", "log", f"--since={since.isoformat()}", "--oneline"],
+        capture_output=True,
+        text=True,
+        check=False,
+        cwd=project,
+    )
+    return not result.stdout.strip()
+
+
+def _repo_active(project: Path) -> bool:
+    """Return True when at least one commit landed in the last 24 hours."""
+    result = subprocess.run(  # noqa: S603
+        ["git", "log", "--since=24h", "--oneline"],
+        capture_output=True,
+        text=True,
+        check=False,
+        cwd=project,
+    )
+    return bool(result.stdout.strip())
 
 
 # ── Pick-ticket output parser ─────────────────────────────────────────────────
@@ -312,7 +343,11 @@ def parse_pick(result_text: str) -> str | None:
 
 
 def _claude_argv(
-    skill: str, budget: float, *, project_scoped: bool = False
+    skill: str,
+    budget: float,
+    *,
+    project_scoped: bool = False,
+    model: str = MODEL_SONNET,
 ) -> list[str]:
     argv = [
         "claude",
@@ -326,7 +361,7 @@ def _claude_argv(
         "--max-budget-usd",
         f"{budget:.2f}",
         "--model",
-        "sonnet",
+        model,
         "--settings",
         str(HARNESS_DIR / "scripts" / "beat-settings.json"),
     ]
@@ -345,6 +380,7 @@ def run_skill(
     timeout_s: int,
     cwd: Path,
     project_scoped: bool = False,
+    model: str = MODEL_SONNET,
 ) -> tuple[int, str]:
     """Invoke a Claude skill; return (exit_code, last_result_text).
 
@@ -352,7 +388,7 @@ def run_skill(
     Returns exit_code=TIMEOUT_EXIT_CODE on timeout.
     project_scoped=True omits --add-dir harness to prevent cross-project ticket leakage.
     """
-    argv = _claude_argv(skill, budget, project_scoped=project_scoped)
+    argv = _claude_argv(skill, budget, project_scoped=project_scoped, model=model)
 
     if DRY_RUN:
         _log(f"[dry-run] {' '.join(argv)}")
@@ -469,20 +505,19 @@ def _orchestrate(project: ProjectConfig) -> tuple[str, str | None]:
         suffix = "timeout" if hk_rc == TIMEOUT_EXIT_CODE else f"rc={hk_rc}"
         _log(f"=== housekeeping: {suffix if hk_rc != 0 else 'done'} {_now_iso()} ===")
     else:
-        _log(
-            f"=== housekeeping: skipped "
-            f"(ran within {HOUSEKEEPING_INTERVAL_S // 3600}h) {_now_iso()} ==="
-        )
+        _log(f"=== housekeeping: skipped {_now_iso()} ===")
 
     # Pick ticket
     hostname = socket.gethostname()
-    _log(f"=== pick-ticket: running {_now_iso()} ===")
+    pick_model = MODEL_SONNET if _repo_active(path) else project.pick_ticket_model
+    _log(f"=== pick-ticket: running model={pick_model} {_now_iso()} ===")
     pt_rc, pt_result = run_skill(
         f"/pick-ticket\n\nRunning on: {hostname}",
         budget=project.budget_pick_ticket,
         timeout_s=PICK_TICKET_TIMEOUT_S,
         cwd=path,
         project_scoped=True,
+        model=pick_model,
     )
 
     if pt_rc == TIMEOUT_EXIT_CODE:

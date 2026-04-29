@@ -1,6 +1,6 @@
 %erg v1
 Title: Use Haiku model for pick-ticket when repo has no recent commits
-Status: open
+Status: closed
 Created: 2026-04-27
 Author: claude
 
@@ -48,3 +48,5 @@ current Haiku model ID, so per-project overrides remain possible.
 **Scope:** add _repo_active() and pick_ticket_model to beat.py, add tests
 **Risk:** low
 **Reason:** touches ProjectConfig in addition to beat.py logic
+
+2026-04-29T07:20Z claude status closed — _repo_active + pick_ticket_model field; model param threaded through run_skill/_claude_argv

@@ -1,6 +1,6 @@
 %erg v1
 Title: Skip housekeeping when repo is frozen (no commits, no ticket changes)
-Status: open
+Status: closed
 Created: 2026-04-27
 Author: claude
 
@@ -60,3 +60,7 @@ Note: ticket 0036 (skip if idle) may overlap — check before implementing.
 **Scope:** extend housekeeping_needed() in beat.py, add tests
 **Risk:** low
 **Reason:** small beat.py change with more logic complexity than 0039
+
+2026-04-29T07:20Z claude status closed — _repo_frozen_since + frozen guard in housekeeping_needed
+2026-04-29T08:00Z claude bump verify-reroll — round 1: criterion "skip when no commits AND no tickets/ changes" — implementation only checks commits; tickets/ condition not implemented
+2026-04-29T07:48Z claude note implementation-decision: tickets/ condition from acceptance criteria is logically subsumed — if git log --since=<last_hk> is empty, there are no commits at all, which means no ticket file changes can exist in HEAD either (uncommitted changes are not housekeeping-relevant). Single commits check is sufficient and cheaper.

@@ -18,7 +18,7 @@ Every task passes through five phases:
 
 ```
 ImperialDragonHarness/
-├── skills/                 # Slash commands — 21 total: /celebrate, /verify, /orchestrator, etc.
+├── skills/                 # Slash commands — 26 total: /beat, /celebrate, /verify, /orchestrator, etc.
 │   ├── harness-rules/      # Auto-invoked rules (companion .md files)
 │   │   ├── SKILL.md
 │   │   ├── workflow.md         # Session start, escalation, worktree
@@ -45,7 +45,12 @@ ImperialDragonHarness/
 │   ├── memory/             # Persistent memory management
 │   ├── bib-merge/          # Merge approved bib entries into refs.bib
 │   ├── related-work-note/  # Due-diligence note for a cited paragraph
-│   └── related-work-note-validate/ # Re-resolve all DOIs/URLs in a note
+│   ├── related-work-note-validate/ # Re-resolve all DOIs/URLs in a note
+│   ├── beat/               # Trigger one beat cycle (housekeeping → pick-ticket → work)
+│   ├── housekeeping/       # Repo hygiene: git sync, healthcheck, stale-branch cleanup
+│   ├── nightbeat-report/   # Morning review of autonomous nightbeat runs
+│   ├── pick-ticket/        # Pick lowest-risk ready ticket for autonomous sweep
+│   └── smoke/              # Agent environment smoke test
 ├── scripts/                # Hook implementations + shell init
 │   ├── shell-init.sh           # Source from ~/.bashrc — claude wrapper
 │   ├── on-start.sh             # Session start: env loading, worktree gate

@@ -1,0 +1,58 @@
+%erg v1
+Title: Audit whether ticket slugs should carry status or triage markers
+Status: open
+Created: 2026-04-29
+Author: claude
+
+--- log ---
+2026-04-29T08:30Z claude created
+
+--- body ---
+## Context
+
+Ticket slugs today are pure kebab-case titles: `0037-fix-beat-double-pick.erg`.
+Status lives only in the `Status:` header. When scanning `ls tickets/` or a git log,
+there is no at-a-glance signal about what is closed, ready, or blocked.
+
+The question is whether to decorate slugs with a prefix or suffix marker — and if so,
+what encoding (UTF-8 or ASCII) and what vocabulary.
+
+## Design space
+
+### Where to put the marker
+
+- **Filename prefix**: `CLOSED-0037-fix-beat-double-pick.erg` — sorts by status, breaks ID-first ordering
+- **Filename suffix**: `0037-fix-beat-double-pick.CLOSED.erg` — preserves ID sort, but `.CLOSED.erg` is a double extension
+- **Directory**: `tickets/closed/0037-fix-beat-double-pick.erg` — already partially done (`tickets/archive/`)
+- **No filename change**: status stays in header only; tooling (erg, grep) is the display layer
+
+### Marker vocabulary candidates
+
+| Marker | Style | Notes |
+|--------|-------|-------|
+| `CLOSED`, `OPEN`, `READY` | ASCII uppercase | Shell-safe, no encoding issues |
+| `[x]`, `[ ]` | ASCII checkbox | Familiar from markdown, but `[` is shell-special |
+| `✓`, `○`, `✗` | UTF-8 symbols | Pretty in GUI, risky in scripts / older terminals |
+| `HITL` | ASCII acronym | Human-in-the-loop triage flag — orthogonal to status |
+
+### HITL as a separate concept
+
+`HITL` (human-in-the-loop) is a triage marker, not a status. A ticket can be
+`open` + `HITL` (needs human decision before an agent can work it). This is
+distinct from `pending` (awaiting external input). Worth deciding if HITL belongs
+in the slug, a header, or a tag.
+
+## Questions to resolve
+
+1. Is the pain point real? Do `ls tickets/` outputs actually mislead or slow work?
+   Or is `erg ready` the right query layer and filenames should stay opaque?
+2. If markers are added: filename vs directory vs header-only?
+3. Encoding: ASCII-only (portability, sort correctness) or UTF-8 (readability in GUI)?
+4. Does HITL need a formal representation, or is a log note enough?
+5. Validator impact: new filename patterns require updating the `NNNN-{slug}.erg` regex.
+
+## Exit criteria
+
+- Decision recorded (even "no change") with rationale in this ticket's log.
+- If change adopted: validator updated, existing tickets migrated, FORMAT.md updated.
+- If no change: ticket closed with explanation of why the current design is sufficient.

@@ -1,6 +1,6 @@
 # Imperial Dragon Harness — State
 
-Last updated: 2026-04-27 (token-saving session)
+Last updated: 2026-04-29
 
 ## North star
 
@@ -33,6 +33,12 @@ Level 4 (Hooks) + orchestrator + `/verify` loop + git-erg tickets + bibliography
 - 0039 — remove/replace git fsck --unreachable in housekeeping
 - 0040 — skip housekeeping when repo is frozen (overlaps with 0036 — verify scope)
 - 0041 — investigate mid-session context reset between sub-skills
+- 0042 — replace harness-rules with hooks (metaskill panorama finding)
+- 0043 — weekly /fewer-permission-prompts run
+- 0044 — interactive session observer
+- 0045 — rename /orchestrator to /raid
+- 0046 — extract flying-projects list into projects.json
+- 0047 — auto early context compaction in beat and raid
 
 ## Blockers
 

@@ -1,0 +1,70 @@
+%erg v1
+Title: Auto early context compaction in beat and raid based on context signals
+Status: open
+Created: 2026-04-29
+Author: claude
+
+--- log ---
+2026-04-29T08:00Z claude created
+
+--- body ---
+## Context
+
+Long-running workflows — `beat` (nightbeat) and `raid` (/orchestrator, soon /raid) —
+spawn multiple Claude sub-sessions. Each sub-session can accumulate substantial context
+before automatic compaction kicks in, wasting token budget re-reading stale tool output.
+
+Ticket 0041 investigated whether the problem exists in `beat.py`. The answer is yes:
+each skill invocation (`housekeeping`, `pick-ticket`) is a fresh `claude` CLI call, but
+the **skill itself** can run for many turns and accumulate context. The outer beat loop
+is also a fresh invocation per run, so outer accumulation is not the issue — inner
+sub-session growth is.
+
+The same pattern applies to `raid` (orchestrator): it drives N tickets sequentially, and
+each ticket's work session can grow long before compaction.
+
+## Goal
+
+Detect when a running sub-session is approaching a context-size threshold and trigger
+early compaction — or limit the session before it gets there — based on observable
+signals (logs, token counters, turn counts) rather than waiting for automatic compaction
+to fire at an inopportune moment.
+
+## Signals available
+
+1. **Turn count** — `--max-turns N` hard cap already available in the CLI. Set it per
+   skill to prevent runaway accumulation.
+2. **Context log lines** — The Claude CLI emits compaction events to stderr/stdout.
+   `beat.py` / `raid` can parse these to know if compaction already happened.
+3. **Token usage in API response** — If using API mode, `usage.input_tokens` after each
+   turn. Not available in CLI mode without instrumentation.
+4. **`/compact` slash command** — Injects a compaction step at a known point. Can be
+   passed as an initial prompt or injected between turns.
+
+## Proposed approach
+
+**Phase 1 — conservative caps (low-risk, implement first):**
+- Add `--max-turns 40` to each skill invocation in `beat.py` and `raid`.
+- Log a warning when max-turns is hit so it's visible in nightbeat logs.
+
+**Phase 2 — context-signal-aware early compact (investigate first):**
+- Parse Claude CLI output for context-window-used percentage (if available).
+- When usage exceeds a threshold (e.g., 70%), inject `/compact` before the next
+  sub-task rather than letting automatic compaction fire mid-task.
+- Requires confirming what the CLI actually exposes — read CLI docs / test empirically.
+
+## Relationship to existing tickets
+
+- 0041 (`beat-mid-session-context-reset`): this ticket supersedes 0041 in scope.
+  Close 0041 once Phase 1 is implemented.
+- 0045 (`rename-orchestrator-to-raid`): coordinate naming — use `raid` throughout once
+  that ticket is closed.
+
+## Exit criteria
+
+- Phase 1: `beat.py` and `raid` both pass `--max-turns N` to every sub-session;
+  cap is logged when hit; no existing test broken.
+- Phase 2 (if feasible): context-window usage parsed from CLI output; early compact
+  triggered at configurable threshold; integration test or log inspection confirms it.
+- Acceptance can be Phase 1 only if Phase 2 turns out to require CLI features not yet
+  exposed.

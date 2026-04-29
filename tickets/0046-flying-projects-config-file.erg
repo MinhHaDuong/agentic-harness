@@ -1,0 +1,58 @@
+%erg v1
+Title: Extract flying-projects list from beat.py into a standalone config file
+Status: open
+Created: 2026-04-29
+Author: claude
+
+--- log ---
+2026-04-29T08:00Z claude created
+
+--- body ---
+## Context
+
+`beat.py` hardcodes the list of monitored projects as a `PROJECTS: list[ProjectConfig]`
+constant (around line 85). Adding, removing, or tuning a project requires editing Python
+source. This creates friction for the common case of "I started a new project, add it to
+nightbeat" and couples project inventory to implementation.
+
+`beat-settings.json` already exists for Claude CLI settings; the pattern of a companion
+config file is established.
+
+## Goal
+
+A simple, human-editable config file (e.g., `projects.json` or `projects.toml`) that
+`beat.py` reads at startup to populate its `PROJECTS` list. The file should require no
+Python knowledge to edit.
+
+## Proposed config format (projects.json sketch)
+
+```json
+[
+  { "path": "~/CNRS/projets/actifs/aedist-technical-report", "day_budget": 0.40, "night_budget": 0.50 },
+  { "path": "~/CNRS/code/maiba",                             "day_budget": 0.40, "night_budget": 0.50 },
+  { "path": "~/.claude",                                     "day_budget": 0.40, "night_budget": 0.50 },
+  { "path": "~/Climate_finance" },
+  { "path": "~/fuzzy-corpus" }
+]
+```
+
+Omitted budget keys default to the existing `ProjectConfig` defaults.
+
+## Actions
+
+1. Define the schema (JSON preferred for zero-dependency parsing; TOML acceptable if
+   already available in the venv).
+2. Add a `load_projects(config_path)` function in `beat.py` that reads the file and
+   returns `list[ProjectConfig]`. Fall back gracefully if file absent (warn + use
+   current hardcoded defaults).
+3. Replace the `PROJECTS` constant initializer with a call to `load_projects`.
+4. Write a new `projects.json` in `scripts/` with the current project list.
+5. Update `tests/test_beat.py` to cover the load function.
+
+## Exit criteria
+
+- `projects.json` is the authoritative source; `beat.py` no longer contains a hardcoded
+  project list.
+- Adding a project requires only editing `projects.json`.
+- 62 + N pytest tests pass.
+- `beat.py` falls back to logged defaults when config file is missing.
