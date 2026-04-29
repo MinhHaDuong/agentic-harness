@@ -1,0 +1,62 @@
+%erg v1
+Title: Simplify pick-ticket skill to delegate mechanical steps to erg pick
+Status: open
+Created: 2026-04-29
+Blocked-by: git-erg/0008
+Author: claude
+
+--- log ---
+2026-04-29T11:20Z claude created
+
+--- body ---
+## Context
+
+The `pick-ticket` skill currently implements mechanical exclusion rules
+(status tags, cooldown checks, 3-strikes) as LLM steps — reading ticket
+bodies one by one and calling `erg sweep-skip`/`erg sweep-write` inline.
+
+Once git-erg/0008 ships `erg pick --json` and `erg pick-record`, all the
+mechanical work moves to the binary. The LLM's only remaining job is the
+one step that genuinely requires judgment: ranking the shortlisted candidates
+by scope fit and risk, then recording the winner.
+
+The current N-sequential-Read anti-pattern (one `Read` per cache:miss ticket)
+disappears because the binary returns all candidate bodies in a single JSON
+response.
+
+## Actions
+
+1. Replace Steps 1–3 of `skills/pick-ticket/SKILL.md` with a single call:
+   ```bash
+   $ERG pick --json tickets/
+   ```
+   If `"candidates": []`, output `IDLE: no eligible tickets` and stop.
+
+2. Keep the ranking step: read each candidate's `body` from the JSON,
+   assess scope and risk, pick the winner.
+
+3. Replace the `erg sweep-write` call with:
+   ```bash
+   $ERG pick-record <winner-id>
+   ```
+
+4. Remove the `erg sweep-skip` / `erg sweep-write` / 3-strikes prose from
+   the skill entirely — those rules now live in the binary.
+
+5. Commit the updated skill on main.
+
+## Test
+
+Run `pick-ticket` against the local tickets/ dir after git-erg/0008 is
+installed. Verify:
+- Output is `PICK: NNNN` or `IDLE: no eligible tickets`
+- `grep "sweep-pick: picked"` appears in the chosen ticket's log
+- No sequential `Read` tool calls for individual ticket bodies
+
+## Exit criteria
+
+- `skills/pick-ticket/SKILL.md` reduced to: resolve `$ERG`, call
+  `erg pick --json`, rank candidates, call `erg pick-record`
+- Skill is under 30 lines of prose
+- All mechanical exclusion steps removed from the skill
+- Tested against live tickets dir with git-erg/0008 installed
