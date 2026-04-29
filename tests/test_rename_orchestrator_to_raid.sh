@@ -11,7 +11,7 @@ fail=0
 # 1. No /orchestrator slash invocations in live surfaces
 #    (scripts/nightbeat-report.py is allowed to keep the bare
 #    "orchestrator:" log-label prefix for dual-accept parsing.)
-hits=$(grep -rn '/orchestrator' skills/ scripts/ commands/ README.md 2>/dev/null || true)
+hits=$(grep -rn '/orchestrator' skills/ scripts/ commands/ README.md STATE.md bin/ 2>/dev/null || true)
 if [[ -n "$hits" ]]; then
   echo "FAIL: /orchestrator still referenced in live code:"
   echo "$hits"
