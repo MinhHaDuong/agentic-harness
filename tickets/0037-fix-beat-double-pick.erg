@@ -1,6 +1,6 @@
 %erg v1
 Title: Fix beat double-pick: orchestrateur termine sans fermer le ticket
-Status: open
+Status: closed
 Created: 2026-04-27
 Author: claude
 
@@ -8,6 +8,8 @@ Author: claude
 2026-04-27T09:00Z claude created
 
 2026-04-27T21:04Z claude note sweep-assess: not-picked hash:a0c7372a77a9 scope:add cooldown guard in pick-ticket skill and warning in beat.py risk:medium
+2026-04-29T08:11Z claude status closed — cooldown-recent-pick guard in pick-ticket skill (A) + done-but-open warning in beat.py (B)
+2026-04-29T08:11Z claude note guard-A-validation — rule implemented in skills/pick-ticket/SKILL.md step 2; manual verification is the validation path (observe nightbeat logs post-merge for absence of cooldown-recent-pick warnings)
 --- body ---
 ## Context
 
@@ -67,3 +69,4 @@ guard d'exclusion — pick-ticket ne le consulte pas pour éviter les re-picks.
 **Scope:** add cooldown guard in pick-ticket skill and warning in beat.py
 **Risk:** medium
 **Reason:** touches both pick-ticket skill and beat.py with more complex logic
+

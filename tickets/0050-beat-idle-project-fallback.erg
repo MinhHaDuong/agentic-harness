@@ -1,0 +1,84 @@
+%erg v1
+Title: Beat should try another project when current one is idle or frozen
+Status: open
+Created: 2026-04-29
+Author: claude
+
+--- log ---
+2026-04-29T10:15Z claude created
+
+--- body ---
+## Context
+
+When `pick-ticket` returns IDLE for the selected project, beat logs
+`outcome=idle` and stops. The timeslot is wasted. Meanwhile other
+projects in the rotation may have eligible tickets.
+
+Similarly, `housekeeping_needed()` already short-circuits on frozen
+repos — but `_repo_active()` is called per-project and the script
+still spins up a full Claude session for pick-ticket even when a
+quick pre-check could skip it.
+
+The user request is two-layered:
+
+1. **Fallback to next project** (runtime layer): if pick-ticket
+   returns IDLE, try the next project in the rotation before
+   reporting idle.
+2. **Script-level skip** (Python layer): before even launching
+   a Claude session for pick-ticket, check from Python whether
+   the repo has any commits or ticket changes since the last
+   pick-ticket run. If nothing changed, skip the Claude invocation
+   entirely and record `outcome=idle` directly.
+
+## Actions
+
+### Layer 1 — Fallback rotation in `_orchestrate` / `main`
+
+In `beat.py`, after `outcome == "idle"`, iterate to the next
+project in `PROJECTS` (skipping the current one and any that are
+locked). Limit fallback depth to `len(PROJECTS) - 1` to avoid
+infinite loops. Log each fallback attempt.
+
+Simplest approach: extract the pick→orchestrate sequence into a
+helper and loop over a shuffled/rotated project list in `main`.
+
+### Layer 2 — Pre-flight pick-ticket skip in Python
+
+Before calling `run_skill("/pick-ticket", ...)`, check:
+
+```python
+def _pick_needed(project: Path, last_beat_at: datetime | None) -> bool:
+    """False when nothing has changed since the last pick run."""
+    if last_beat_at is None:
+        return True
+    # Any commit since last beat?
+    if _repo_active_since(project, last_beat_at):
+        return True
+    # Any ticket file modified since last beat?
+    changed = subprocess.run(
+        ["git", "-C", str(project), "diff", "--name-only",
+         f"HEAD@{{{last_beat_at.isoformat()}}}"],
+        capture_output=True, text=True, check=False,
+    ).stdout
+    return any("tickets/" in l for l in changed.splitlines())
+```
+
+`last_beat_at` is read from the last `beat-log.jsonl` record's
+`last_run_at` field.
+
+If `_pick_needed()` returns False, log `pick-ticket: skipped
+(nothing changed since {last_beat_at})` and record `outcome=idle`
+without spending tokens.
+
+## Exit criteria
+
+- When pick-ticket returns IDLE, beat tries the next unlocked project
+  before reporting idle to the beat log.
+- When nothing changed in the repo since last beat (no commits, no
+  ticket changes), pick-ticket invocation is skipped entirely at
+  the Python level; outcome logged as idle with skip reason.
+- `test_beat.py` covers: fallback-to-next-project path, skip-when-
+  nothing-changed path, and safety (no infinite loop when all
+  projects are idle).
+- Nightbeat logs show `pick-ticket: skipped` or `fallback: trying
+  <project>` lines where applicable.

@@ -865,3 +865,159 @@ class TestHousekeepingFrozenSkip:
                 MagicMock(stdout="abc1234 recent work\n", returncode=0),  # not frozen
             ]
             assert beat.housekeeping_needed(tmp_project) is True
+
+
+# ── load_projects (ticket 0046) ────────────────────────────────────────────────
+
+
+class TestLoadProjects:
+    def test_loads_from_json(self, tmp_path):
+        cfg = tmp_path / "projects.json"
+        cfg.write_text(
+            json.dumps(
+                [
+                    {
+                        "path": "~/foo",
+                        "budget_housekeeping": 0.30,
+                        "budget_pick_ticket": 0.20,
+                    },
+                    {"path": "~/bar"},
+                ]
+            )
+        )
+        projects = beat.load_projects(cfg)
+        assert len(projects) == 2
+        assert projects[0].path == Path.home() / "foo"
+        assert projects[0].budget_housekeeping == 0.30
+        assert projects[0].budget_pick_ticket == 0.20
+        assert projects[1].budget_housekeeping == beat.BUDGET_HOUSEKEEPING
+
+    def test_tilde_expansion(self, tmp_path):
+        cfg = tmp_path / "projects.json"
+        cfg.write_text(json.dumps([{"path": "~/.claude"}]))
+        projects = beat.load_projects(cfg)
+        assert projects[0].path == Path.home() / ".claude"
+
+    def test_pick_ticket_model_optional(self, tmp_path):
+        cfg = tmp_path / "projects.json"
+        cfg.write_text(
+            json.dumps([{"path": "~/x", "pick_ticket_model": "claude-opus-4-7"}])
+        )
+        projects = beat.load_projects(cfg)
+        assert projects[0].pick_ticket_model == "claude-opus-4-7"
+
+    def test_falls_back_when_missing(self, tmp_path, capsys):
+        projects = beat.load_projects(tmp_path / "nonexistent.json")
+        assert projects == beat._BUILTIN_PROJECTS
+        assert "not found" in capsys.readouterr().err
+
+    def test_falls_back_on_bad_json(self, tmp_path, capsys):
+        bad = tmp_path / "projects.json"
+        bad.write_text("not { valid json")
+        projects = beat.load_projects(bad)
+        assert projects == beat._BUILTIN_PROJECTS
+        assert "error" in capsys.readouterr().err.lower()
+
+    def test_falls_back_on_missing_path_key(self, tmp_path, capsys):
+        cfg = tmp_path / "projects.json"
+        cfg.write_text(json.dumps([{"budget_housekeeping": 0.4}]))
+        projects = beat.load_projects(cfg)
+        assert projects == beat._BUILTIN_PROJECTS
+        assert "error" in capsys.readouterr().err.lower()
+
+
+# ── orchestrator done-but-open warning (ticket 0037) ──────────────────────────
+
+
+class TestOrchestratorDoneButOpenWarning:
+    def setup_method(self):
+        beat.DRY_RUN = False
+
+    def _make_ticket(self, tmp_project, ticket_id: str, status: str) -> None:
+        (tmp_project / "tickets").mkdir(exist_ok=True)
+        (tmp_project / f"tickets/{ticket_id}-test-ticket.erg").write_text(
+            f"%erg v1\nTitle: test\nStatus: {status}\nCreated: 2026-01-01\nAuthor: claude\n"
+            f"\n--- log ---\n\n--- body ---\n"
+        )
+
+    def test_warns_when_ticket_not_closed(self, tmp_project):
+        self._make_ticket(tmp_project, "0001", "open")
+        log_lines: list[str] = []
+
+        def fake_run_skill(
+            skill,
+            *,
+            budget,
+            timeout_s,
+            cwd,
+            project_scoped=False,
+            model=beat.MODEL_SONNET,
+        ):
+            if "pick-ticket" in skill:
+                return (0, "PICK: 0001")
+            return (0, "")
+
+        with (
+            patch("beat.housekeeping_needed", return_value=False),
+            patch("beat._repo_active", return_value=False),
+            patch("beat.run_skill", side_effect=fake_run_skill),
+            patch("beat._log", side_effect=log_lines.append),
+        ):
+            beat._orchestrate(beat.ProjectConfig(path=tmp_project))
+
+        assert any(
+            "warning" in l and "0001" in l and "not closed" in l for l in log_lines
+        )
+
+    def test_no_warning_when_ticket_closed(self, tmp_project):
+        self._make_ticket(tmp_project, "0002", "closed")
+        log_lines: list[str] = []
+
+        def fake_run_skill(
+            skill,
+            *,
+            budget,
+            timeout_s,
+            cwd,
+            project_scoped=False,
+            model=beat.MODEL_SONNET,
+        ):
+            if "pick-ticket" in skill:
+                return (0, "PICK: 0002")
+            return (0, "")
+
+        with (
+            patch("beat.housekeeping_needed", return_value=False),
+            patch("beat._repo_active", return_value=False),
+            patch("beat.run_skill", side_effect=fake_run_skill),
+            patch("beat._log", side_effect=log_lines.append),
+        ):
+            beat._orchestrate(beat.ProjectConfig(path=tmp_project))
+
+        assert not any("warning" in l and "not closed" in l for l in log_lines)
+
+    def test_no_warning_when_ticket_file_missing(self, tmp_project):
+        log_lines: list[str] = []
+
+        def fake_run_skill(
+            skill,
+            *,
+            budget,
+            timeout_s,
+            cwd,
+            project_scoped=False,
+            model=beat.MODEL_SONNET,
+        ):
+            if "pick-ticket" in skill:
+                return (0, "PICK: 9999")
+            return (0, "")
+
+        with (
+            patch("beat.housekeeping_needed", return_value=False),
+            patch("beat._repo_active", return_value=False),
+            patch("beat.run_skill", side_effect=fake_run_skill),
+            patch("beat._log", side_effect=log_lines.append),
+        ):
+            beat._orchestrate(beat.ProjectConfig(path=tmp_project))
+
+        assert not any("warning" in l and "not closed" in l for l in log_lines)

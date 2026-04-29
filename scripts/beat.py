@@ -55,6 +55,8 @@ BUDGET_ORCHESTRATOR: float = 5.00
 MODEL_SONNET: str = "sonnet"
 MODEL_HAIKU: str = "claude-haiku-4-5-20251001"
 
+PROJECTS_CONFIG: Path = HARNESS_DIR / "scripts" / "projects.json"
+
 DRY_RUN: bool = os.environ.get("BEAT_DRY_RUN") == "1"
 
 
@@ -86,7 +88,7 @@ class ProjectConfig:
     pick_ticket_model: str = MODEL_HAIKU  # model used when repo has no recent commits
 
 
-PROJECTS: list[ProjectConfig] = [
+_BUILTIN_PROJECTS: list[ProjectConfig] = [
     ProjectConfig(
         path=Path.home() / "aedist-technical-report",
         budget_housekeeping=0.40,
@@ -105,6 +107,35 @@ PROJECTS: list[ProjectConfig] = [
         budget_pick_ticket=0.50,
     ),
 ]
+
+_PROJ_KEYS = {"budget_housekeeping", "budget_pick_ticket", "pick_ticket_model"}
+
+
+def load_projects(config_path: Path) -> list[ProjectConfig]:
+    """Load project list from JSON; fall back to built-in defaults on any error."""
+    if not config_path.exists():
+        print(
+            f"[beat] {config_path} not found, using built-in defaults", file=sys.stderr
+        )
+        return list(_BUILTIN_PROJECTS)
+    try:
+        entries = json.loads(config_path.read_text())
+        return [
+            ProjectConfig(
+                path=Path(e["path"]).expanduser(),
+                **{k: e[k] for k in _PROJ_KEYS if k in e},
+            )
+            for e in entries
+        ]
+    except Exception as exc:  # noqa: BLE001
+        print(
+            f"[beat] error loading {config_path}: {exc}, using built-in defaults",
+            file=sys.stderr,
+        )
+        return list(_BUILTIN_PROJECTS)
+
+
+PROJECTS: list[ProjectConfig] = load_projects(PROJECTS_CONFIG)
 
 
 # ── Logging ────────────────────────────────────────────────────────────────────
@@ -555,6 +586,22 @@ def _orchestrate(project: ProjectConfig) -> tuple[str, str | None]:
         # v1 simplification: rc=0 → "done"; orchestrator may write finer-grained
         # outcomes into beat-log itself, but we don't parse those here.
         outcome = "done"
+        # Warn if orchestrator exited cleanly but left the ticket open (double-pick risk).
+        ticket_files = list(path.glob(f"tickets/{ticket_id}-*.erg"))
+        if ticket_files:
+            status = next(
+                (
+                    ln.split()[1]
+                    for ln in ticket_files[0].read_text().splitlines()
+                    if ln.startswith("Status:")
+                ),
+                "",
+            )
+            if status and status != "closed":
+                _log(
+                    f"=== warning: orchestrator done but ticket {ticket_id}"
+                    f" Status: {status} (not closed) — double-pick risk ==="
+                )
 
     _log(f"=== orchestrator: outcome={outcome} {_now_iso()} ===")
     return outcome, ticket_id

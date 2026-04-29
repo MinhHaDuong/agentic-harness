@@ -1,0 +1,7 @@
+[
+  { "path": "~/aedist-technical-report", "budget_housekeeping": 0.40, "budget_pick_ticket": 0.50 },
+  { "path": "~/cadens",                  "budget_housekeeping": 0.40, "budget_pick_ticket": 0.50 },
+  { "path": "~/Climate_finance" },
+  { "path": "~/fuzzy-corpus" },
+  { "path": "~/.claude",                 "budget_housekeeping": 0.40, "budget_pick_ticket": 0.50 }
+]
