@@ -1,0 +1,40 @@
+%erg v1
+Title: Rewrite README with Imperial Dragon voice
+Status: open
+Created: 2026-04-29
+Author: claude
+
+--- log ---
+2026-04-29T00:00Z claude created
+
+--- body ---
+## Context
+
+The README opens with a dry description: "A Claude Code harness for Minh Ha-Duong's
+research workflow." It does not convey what makes IDH distinctive — the Five Claws
+model, the autonomous `/beat` loop, the `/perch` orientation, the `/raid` sweep.
+
+The intended opening, from the user:
+
+> Casual people get shit done. Real humans ride the Imperial Dragon Harness.
+> They `/raid` tickets to bring back PR, they `/beat` their wings autonomously,
+> they `/perch` to orient midchat.
+
+The GSD skillset (`commands/gsd/`, 32 files) should be removed before or alongside
+this rewrite, since the current structure tree references it and the README must
+be accurate.
+
+## Actions
+
+1. Remove `commands/gsd/` via `git rm -r`.
+2. Rewrite `README.md` starting with the user-supplied opening paragraph.
+3. Update the structure tree: `commands/` entry shows only `choose-journal.md`;
+   skill count corrected to 27; `/orchestrator` annotated as future `/raid`.
+4. Keep installation, ticket management, and "Why not a plugin?" sections intact.
+
+## Exit criteria
+
+- `commands/gsd/` is gone from the repo.
+- `README.md` first paragraph matches the user-supplied text exactly.
+- Structure tree is accurate (no stale GSD reference, correct skill count).
+- CI passes (validate-tickets + skill-lint + leak-guard).
