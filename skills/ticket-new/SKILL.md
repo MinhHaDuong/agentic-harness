@@ -13,12 +13,20 @@ from a conversation. Extract the intent and normalize to `%erg v1`.
 
 ## Steps
 
-1. Determine the next ID:
+1. Determine the next ID — take the maximum across local files **and** origin/main,
+   then increment. This prevents ID collision when two worktrees diverge from main.
    ```bash
-   ls tickets/*.erg tickets/archive/*.erg 2>/dev/null \
-     | sed 's|.*/||; s|-.*||' | sort -n | tail -1
+   # local
+   LOCAL=$(ls tickets/*.erg tickets/archive/*.erg 2>/dev/null \
+     | sed 's|.*/||; s|-.*||' | sort -n | tail -1)
+   # remote (fetch quietly; tolerate offline)
+   git fetch --quiet origin main 2>/dev/null || true
+   REMOTE=$(git ls-tree --name-only origin/main tickets/ 2>/dev/null \
+     | grep '\.erg$' | sed 's|-.*||' | sort -n | tail -1)
+   # pick the higher of the two
+   MAX=$(printf '%s\n%s\n' "$LOCAL" "$REMOTE" | grep -v '^$' | sort -n | tail -1)
    ```
-   Increment by 1, zero-pad to 4 digits. If empty, start at `0001`.
+   Increment `MAX` by 1, zero-pad to 4 digits. If both are empty, start at `0001`.
 
 2. Choose a slug: lowercase kebab-case, ASCII only (`[a-z0-9-]`), derived from the title.
 
