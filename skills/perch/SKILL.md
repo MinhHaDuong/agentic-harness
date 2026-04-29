@@ -9,7 +9,7 @@ argument-hint:
 
 ## Steps
 
-1. **Ground in git.** Run `git log --oneline --since="6am" 2>/dev/null || git log --oneline -10`. Note uncommitted changes (`git status --short`).
+1. **Ground in git.** One Bash call: `git log --oneline --since="6am"; echo "---"; git status --short`. Name dirty files if any — do not diff them.
 
 2. **Report: Done.** What is concretely finished in this conversation:
    - Files written or edited.
