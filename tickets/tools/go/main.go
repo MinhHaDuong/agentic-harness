@@ -1300,13 +1300,20 @@ func cmdSweepSkip(args []string) int {
 		fmt.Fprintf(os.Stderr, "error: %s has no --- body --- separator\n", path)
 		return 1
 	}
-	beforeBody := raw[:idx]
-	if !bytes.HasSuffix(beforeBody, []byte("\n")) {
-		beforeBody = append(beforeBody, '\n')
+	// Build result in a fresh buffer. Do NOT take a sub-slice of raw and
+	// append into it: os.ReadFile returns a slice with cap > len, so
+	// `raw[:idx]` shares the backing array and a subsequent append
+	// silently overwrites the body — corrupting it on disk.
+	logAppend := []byte(logLine + "\n")
+	bodyContent := raw[idx+len(sep):]
+	result := make([]byte, 0, idx+1+len(logAppend)+len(sep)+len(bodyContent))
+	result = append(result, raw[:idx]...)
+	if !bytes.HasSuffix(result, []byte("\n")) {
+		result = append(result, '\n')
 	}
-	result := append(beforeBody, []byte(logLine+"\n")...)
+	result = append(result, logAppend...)
 	result = append(result, sep...)
-	result = append(result, raw[idx+len(sep):]...)
+	result = append(result, bodyContent...)
 	if err := os.WriteFile(path, result, 0644); err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		return 1
