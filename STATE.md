@@ -18,7 +18,7 @@ Level 4 (Hooks) + orchestrator + `/verify` loop + git-erg tickets + bibliography
 
 **Idle skip**: housekeeping skipped when repo has no commits since last run (ticket 0036 closed).
 
-**erg sweep cache**: `erg ready --json` returns `triage`/`hash`/`scope`/`risk` per ticket (renamed from `cache`/`assessment`). `erg sweep-skip` and `erg sweep-write` compute hash server-side. Pick-ticket reads ticket bodies only on cache:miss. 82 pytest + 24 Go tests, all green. Skills resolve erg binary as `${ERG:-erg}` for PATH portability.
+**erg sweep cache**: `erg ready --json` returns `cache`/`hash` per ticket. `erg sweep-skip` and `erg sweep-write` compute hash server-side. Pick-ticket reads ticket bodies only on cache:miss. 82 pytest + 24 Go tests, all green. Skills resolve erg binary as `${ERG:-erg}` for PATH portability.
 
 **git-erg**: pre-commit hooks installed in all four projects. `erg` binary present in all four. Added as nightbeat target (ticket 0009-add-ci open).
 
