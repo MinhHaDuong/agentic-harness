@@ -1,0 +1,65 @@
+%erg v1
+Title: Fix night-sweep permission denials on .erg ticket edits
+Status: open
+Created: 2026-04-29
+Author: claude
+
+--- log ---
+2026-04-29T09:30Z claude created
+
+--- body ---
+## Context
+
+The night-sweep agent is denied `Edit`, `Write`, and `Bash` when trying
+to close `.erg` ticket files in the `.claude` project (runs 2026-04-28T21:00Z
+and 2026-04-29T02:02Z, both working ticket 0039). The agent diagnosed the
+situation correctly each time but could not commit the closure — causing the
+same ticket to be re-picked the following night.
+
+Beat runs with `--permission-mode bypassPermissions`, which should bypass
+all permission prompts. The guard hooks (guard-destructive-bash.sh,
+guard-commit-on-main.sh) do not block `.erg` edits. The denials appear in
+the `permission_denials` field of the Claude Code log, suggesting a behavior
+change in a recent Claude Code rollout rather than a misconfiguration on our
+side.
+
+Claude Code is a rolling release with active changes on the permission front.
+Any fix here may need revisiting as the platform evolves.
+
+**Caution:** do not close this ticket until behavior has been demonstrably
+stable for at least 2 weeks. A fix that works today may regress on the next
+Claude Code rollout.
+
+## Actions
+
+1. Reproduce: run a dry beat on `.claude` project and attempt to edit a
+   `.erg` file — confirm which permission layer is blocking.
+
+2. Diagnose: compare `beat-settings.json` against the current Claude Code
+   permission model. Check whether `bypassPermissions` still covers Edit/Write
+   in the current rollout, or whether explicit allow rules are now required
+   even in bypass mode.
+
+3. Fix (one of):
+   a. Add `Edit(tickets/*.erg)`, `Write(tickets/*.erg)`, `Bash(git commit*)` to
+      the allow list in `beat-settings.json` — belt-and-suspenders regardless
+      of bypass mode.
+   b. If bypassPermissions is genuinely broken for hooks, file an upstream
+      issue and work around with explicit allows.
+
+4. Monitor beat logs for 2 weeks after the fix. If `denied:Edit` or
+   `denied:Write` reappear on `.erg` files, re-open this ticket.
+
+## Test
+
+Run beat on `.claude` with `BEAT_DRY_RUN=0` against a scratch open ticket
+whose only action is editing its own `.erg` Status line. Verify the edit
+and commit succeed and no `permission_denials` appear in the log.
+
+## Exit criteria
+
+- Night-sweep agent can edit and commit `.erg` ticket files without denial
+- No `denied:Edit`, `denied:Write`, or `denied:Bash` entries in beat-log for
+  `.claude` project ticket-close operations
+- Behavior confirmed stable across at least 14 consecutive days of beats
+  (check: zero denials in `nightbeat-report --hours 336`)
