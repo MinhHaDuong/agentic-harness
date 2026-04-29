@@ -1,11 +1,13 @@
 %erg v1
 Title: Audit whether ticket slugs should carry status or triage markers
-Status: open
+Status: closed
 Created: 2026-04-29
 Author: claude
 
 --- log ---
 2026-04-29T08:30Z claude created
+2026-04-29T12:00Z claude note decision — no change. Filenames stay opaque (NNNN-slug.erg). Status remains a header. Rationale appended to body under "## Decision".
+2026-04-29T12:00Z claude status closed — design question resolved; no code/format changes required.
 
 --- body ---
 ## Context
@@ -56,3 +58,77 @@ in the slug, a header, or a tag.
 - Decision recorded (even "no change") with rationale in this ticket's log.
 - If change adopted: validator updated, existing tickets migrated, FORMAT.md updated.
 - If no change: ticket closed with explanation of why the current design is sufficient.
+
+## Decision — no change
+
+Filenames stay opaque: `NNNN-slug.erg`. Status remains a header. No validator
+change, no bulk rename of the existing 47 tickets, no new vocabulary.
+
+### Load-bearing rationale: identity vs state
+
+A filename is an **identity** — immutable, referenced from commit messages,
+PR descriptions, `Blocked-by:` headers, and human conversation. A `Status:`
+value is **state** — mutable, changing roughly three times per ticket
+lifecycle (`open` → `doing` → `closed`, sometimes via `pending`).
+
+Encoding state in identity means every transition triggers a `git mv`. With
+34 of 47 current tickets already closed, adopting a status marker now would
+require 34+ renames in a single migration commit and would force every
+future close to perform a rename + header-edit pair with no transaction
+guarantee. Past commits referencing "see 0037-fix-beat-double-pick" become
+stale text. The `git log --follow` story degrades for everyone.
+
+The right separation is what we already have:
+- **Identity** (filename, ID, blocker refs) — stable.
+- **State** (Status header, log lines) — mutates freely without renames.
+- **Display** — `erg ready`, `erg ready --json`, `erg graph`. The query
+  layer is the at-a-glance view; `ls tickets/` was never designed to be it.
+
+### Supporting arguments
+
+1. **`erg ready` already solves the stated friction.** Running it on this
+   repo right now returns 11 unblocked tickets sorted by ID with titles —
+   strictly more useful than any filename-prefix scheme would be, because it
+   resolves `Blocked-by` transitively and consults `.git/ticket-wip/` for
+   live claims. Filenames cannot encode either.
+2. **Shell portability.** `[`, `]`, and UTF-8 glyphs (`✓`, `○`) in
+   filenames break globs, complete-on-tab in some shells, and `find -name`
+   patterns. ASCII-only markers (`CLOSED-`, `OPEN-`) are safe but ugly and
+   still trip sort order (closed tickets cluster away from their ID
+   neighbours).
+3. **Validator churn.** The current regex is
+   `^\d{4}-[a-z0-9]+(-[a-z0-9]+)*\.erg$` (one line in `tickets/tools/go/main.go`).
+   Loosening it to accept optional status prefixes/suffixes adds parsing
+   ambiguity (is `CLOSED` a slug word or a marker?) and pulls Postel's-Law
+   tolerance into the validator, which is meant to be strict on write.
+4. **Migration cost vs benefit.** A bulk rename touches 34 files, every
+   `Blocked-by` resolver in tooling, and the archive directory if it
+   existed (it doesn't yet). The benefit — replacing one `erg ready`
+   invocation with one `ls` invocation — is not worth that.
+
+### HITL question — also no slug change
+
+Human-in-the-loop is already covered by the `pending` status (defined in
+FORMAT.md as "awaiting external input"). The `bump` log verb with its
+mandatory category (`permission`, `author-decision`, `test-failure`,
+`verify-reroll`, `circuit-breaker`) gives finer-grained signal than a slug
+marker ever could, and it lives in append-only history rather than a
+mutable filename. If a future need emerges for a triage axis truly
+orthogonal to status, the right move is a new optional header in
+`%erg v2` (e.g., `Triage: hitl`) — not a filename token.
+
+### Adjacent finding (not fixed here)
+
+The "ls tickets/ is noisy" intuition behind this ticket is real: 34 of 47
+files are closed. The remedy is **archive cadence**, not slug encoding.
+Current archive criterion is `closed + 90 days`; running `erg archive
+tickets/` today reports nothing eligible because the closes are recent.
+When the cohort ages, `tickets/archive/` will absorb the noise and active
+`ls` output will shrink naturally. A separate ticket can revisit the
+90-day threshold if friction persists past that horizon.
+
+### Net effect
+
+No files renamed. No validator edits. No FORMAT.md edits. The design
+question is resolved with rationale in this log; future ambiguity should be
+answered by pointing back to this ticket.
