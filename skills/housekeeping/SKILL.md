@@ -11,7 +11,7 @@ Run full repo housekeeping and act on every finding.
 
 ## Steps
 
-1. **Git sync.** `git fetch --all --prune --quiet`. Log if working tree is dirty (do not abort).
+1. **Git sync.** `git fetch --all --prune --quiet` then `git gc --auto`. Log if working tree is dirty (do not abort).
 
 2. **Healthcheck.** Invoke /healthcheck. Parse the Action plan.
 
