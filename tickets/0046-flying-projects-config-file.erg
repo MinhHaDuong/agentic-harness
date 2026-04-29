@@ -6,7 +6,7 @@ Author: claude
 
 --- log ---
 2026-04-29T08:00Z claude created
-
+2026-04-29T08:11Z claude status closed — load_projects() + projects.json; beat.py no longer hardcodes project list
 --- body ---
 ## Context
 
@@ -57,4 +57,3 @@ Omitted budget keys default to the existing `ProjectConfig` defaults.
 - 62 + N pytest tests pass.
 - `beat.py` falls back to logged defaults when config file is missing.
 
-2026-04-29T08:11Z claude status closed — load_projects() + projects.json; beat.py no longer hardcodes project list
