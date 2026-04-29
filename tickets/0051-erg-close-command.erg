@@ -2,7 +2,7 @@
 Title: Add erg claim/release/close commands, modularize Go source, add godoc
 Status: open
 Created: 2026-04-29
-Author: claude
+Author: user
 
 --- log ---
 2026-04-29T10:00Z claude created
