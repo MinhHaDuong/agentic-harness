@@ -1,6 +1,6 @@
 # Imperial Dragon Harness — State
 
-Last updated: 2026-04-29
+Last updated: 2026-04-29T00:00Z
 
 ## North star
 
@@ -39,6 +39,10 @@ Level 4 (Hooks) + orchestrator + `/verify` loop + git-erg tickets + bibliography
 - 0045 — rename /orchestrator to /raid
 - 0046 — extract flying-projects list into projects.json
 - 0047 — auto early context compaction in beat and raid
+- 0053 — rewrite README with Imperial Dragon voice (remove GSD, new opener)
+- 0054 — [discussion] restore Five-Claws phase announcement at session start
+- 0055 — [discussion] milestone/epic layer above tickets
+- 0056 — [discussion] mid-session pause/resume checkpoints
 
 ## Blockers
 
