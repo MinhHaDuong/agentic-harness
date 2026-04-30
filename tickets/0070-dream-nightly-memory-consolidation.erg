@@ -1,0 +1,134 @@
+%erg v1
+Title: Add /dream skill — autonomous nightly memory consolidation
+Status: open
+Created: 2026-04-30
+Author: claude
+
+--- log ---
+2026-04-30T13:30Z claude created
+
+--- body ---
+## Context
+
+Anthropic reportedly runs a nightly server-side pass over Claude memory
+(dedup, merge, prune, regenerate index). Claude Code ships no native
+equivalent.
+
+Existing harness skills do partial memory work but are anchored to a recent
+user-driven event:
+
+- `/celebrate` pre-checks "branch merged into origin/main" and references
+  "the task just completed" — meaningless when fired cold by a timer.
+- `/end-session` reflects on `git log --since="6am"` and refreshes a single
+  project's `STATE.md` — wrong scope (one repo) and wrong trigger (assumes
+  same-day session).
+
+The actual consolidation logic is a one-liner in step 10 of `/end-session`
+("memory sweep — follow `/memory` skill"). The `/memory` skill is policy
+(caps, TTLs, staleness criteria) without an LLM-driven dedup/merge pass.
+
+Proposal: a new skill `/dream` that performs autonomous nightly
+consolidation across all project memory dirs, runnable both manually and as
+a `/schedule`-fired agent. `/celebrate` and `/end-session` remain
+user-driven and task-scoped; `/dream` is the cross-project, cron-friendly
+sibling.
+
+## Design — patterns lifted from published OSS (initial survey)
+
+- **Tool-call classifier over k-neighborhood** (mem0, arXiv 2504.19413).
+  For each candidate fact, retrieve neighbors and force the LLM to emit one
+  of `ADD | UPDATE | DELETE | NOOP`. Prevents silent dedup drift.
+- **Recursive reflection** (Generative Agents, Park 2023, arXiv 2304.03442).
+  After dedup, draft N higher-level insights from survivors and rewrite
+  `MEMORY.md` from those.
+- **Bi-temporal invalidation** (Zep / Graphiti, arXiv 2501.13956). Don't
+  `rm`; rewrite in place — git history already gives bi-temporal recovery
+  for free.
+- **Sleep-time decoupling** (Letta, https://docs.letta.com/guides/agents/architectures/sleeptime).
+  Run as a separate scheduled agent on a cheaper model against a frozen
+  snapshot. Safe to abort. Default: haiku 4.5.
+- **Importance-sum trigger** (Park) — optional v2; v1 is plain time-based.
+
+## Actions
+
+1. **Fresh deep-research pass before any code.** This is bleeding-edge — the
+   above survey is from 2026-04-30 and the field is moving weekly. Before
+   the implementer writes a line, re-run the literature pass: Letta sleep-time
+   updates since 2026-Q1, mem0 ≥ v0.2 schema changes, A-MEM follow-ups,
+   Anthropic blog/docs for any newly-public memory-management primitives,
+   Cognee `memify` semantics, anything from NeurIPS / ICLR 2026. Reconcile
+   with the patterns above; reject any pattern that's been retracted or
+   superseded. Capture the second-round findings in a companion note
+   (`docs/dream-research.md`) before opening the implementation PR.
+
+2. Create `~/.claude/skills/dream/SKILL.md`. Frontmatter:
+   `user-invocable: true`, description names "autonomous nightly memory
+   consolidation".
+
+3. Cross-project scope. The skill iterates over
+   `~/.claude/projects/*/memory/`. For each project dir:
+   a. Read `MEMORY.md` index + every memory file.
+   b. For each entry, classify against neighbors via tool call
+      (`ADD | UPDATE | DELETE | NOOP`). Apply staleness rules from `/memory`.
+   c. Apply edits in place via `Edit`/`Write`. Never `rm` — leave a tombstone
+      line if needed; git is the audit log.
+   d. Regenerate `MEMORY.md` from the survivor set.
+   e. Commit in IDH with `dream: consolidate <project> memory (<n>→<m>)`.
+
+4. Refactor `/end-session` step 10 to call `/dream <current-project>`. Same
+   single-project scope as today, but end-session and the timer share an
+   implementation.
+
+5. `/celebrate` unchanged — its current docs already say "save only, no
+   sweep".
+
+6. Trigger surface:
+   - Manual: `/dream` (no args = sweep all projects; arg = project name).
+   - Scheduled: document a `/schedule` recipe in the SKILL.md, e.g.
+     `0 2 * * *` running `/dream` autonomously.
+
+7. Idempotence + safety:
+   - `/dream --dry-run` reports proposed edits without writing.
+   - Skip projects with no memory-file mtime change since last consolidation
+     marker (one-line log).
+   - Default model haiku 4.5; allow override.
+   - All git operations confined to IDH; never touch project repos.
+
+8. Update `STATE.md` "Morning review" section to mention nightly
+   consolidation and where to inspect the diff (`git log --grep='^dream:'`).
+
+## Test (TDD red step)
+
+Fixture project memory dir with two contradicting feedback entries added
+on different dates ("use vim" / "use emacs"). Run `/dream --dry-run`.
+Assert: older entry classified `DELETE`; newer survives; proposed
+`MEMORY.md` drops the dead pointer; no files actually written.
+
+## Exit criteria
+
+- Second-round research note committed at `docs/dream-research.md`,
+  reconciling the initial survey with current state of the art.
+- `~/.claude/skills/dream/SKILL.md` exists, user-invocable, runs with no
+  args.
+- `/end-session` step 10 delegates to `/dream <project>`.
+- `/schedule` recipe documented in SKILL.md (sample cron line, opt-in).
+- Dry-run on the AEDIST project memory dir produces a sensible diff
+  (manual review by the author before merge).
+- At least one `dream: consolidate ...` commit appears in IDH history
+  within one week of merge (proves the timer fires).
+
+## Notes
+
+- Ticket 0067 may rename `celebrate`→`roar` and `end-session`→`lair`. If
+  0067 lands first, update the action items here to match. Ordering is not
+  blocking either way.
+- Naming: `/dream` matches Imperial Dragon voice (dragons in their lair,
+  dreaming over the hoard). Bikeshed welcome but not load-bearing.
+
+## References (initial survey, 2026-04-30 — re-validate per Action 1)
+
+- Letta sleep-time agents — https://docs.letta.com/guides/agents/architectures/sleeptime
+- mem0 paper (ADD/UPDATE/DELETE/NOOP) — https://arxiv.org/abs/2504.19413
+- Generative Agents reflection (Park 2023) — https://ar5iv.labs.arxiv.org/html/2304.03442
+- A-MEM (Zettelkasten link updates) — https://arxiv.org/abs/2502.12110
+- Zep / Graphiti bi-temporal — https://arxiv.org/abs/2501.13956
