@@ -45,3 +45,10 @@ Actor is typically `claude` or `haduong`. Detail is free text after the verb.
 
 Write bump lines to the main-repo ticket file at `~/.claude/tickets/{ticket}.erg`,
 not to any worktree copy.
+
+## Cross-worktree concurrency
+
+The branch is the WIP signal: start work by creating a branch whose name
+contains the ticket ID. No claim/release protocol — concurrent sweeps may
+pick the same ticket and diverge onto different branches; the merge sorts
+it out. Do not reintroduce a local lockfile.

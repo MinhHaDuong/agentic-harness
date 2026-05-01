@@ -24,8 +24,6 @@ Level 4 (Hooks) + raid + `/verify` loop + git-erg tickets + bibliography pipelin
 
 **Worktree lifecycle**: worktrees created via `Agent(isolation:"worktree")` are harness-managed. Skills must not rm them manually. Raid wrap-up step "Clean up worktrees" removed (2026-04-30).
 
-**Cross-worktree concurrency**: claim/release dropped (git-erg 0013). The branch is the WIP signal — start work by creating a branch whose name contains the ticket ID. Concurrent sweeps may pick the same ticket; they diverge onto different branches and the merge sorts it out. A local lockfile in IDH is rejected by design — same mechanism, different home, same problems.
-
 ## Open tickets
 
 - 0013 — bib-to-zotero (push refs.bib to Zotero via API at submission)
