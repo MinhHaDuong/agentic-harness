@@ -1,0 +1,37 @@
+%erg v1
+Title: Add unit test for hasBranch in erg binary
+Status: open
+Created: 2026-05-02
+Author: claude
+
+--- log ---
+2026-05-02T20:25Z claude created
+
+--- body ---
+## Context
+
+`hasBranch(id string) bool` in `tickets/tools/go/main.go` has no unit test.
+Identified during PR #81 review. The function is the sole claim-check in
+`cmdReady` and `cmdGraph` after the branch-as-claim migration (ticket 0066).
+
+## Actions
+
+1. Add a test fixture that initialises a temporary git repo, creates/deletes
+   branches, and asserts `hasBranch` returns the correct value.
+2. Cover: local branch match, local branch no-match, remote branch match
+   (simulated via a second bare repo), and the offline-safe fallback (remote
+   check failure treated as no-claim).
+
+## Test
+
+```go
+func TestHasBranchLocal(t *testing.T) {
+    // init temp repo, create branch "0099-foo", assert hasBranch("0099") == true
+    // assert hasBranch("0098") == false
+}
+```
+
+## Exit criteria
+
+`go test ./tickets/tools/go/...` passes with the new test covering at least
+the local-branch true and false cases.
