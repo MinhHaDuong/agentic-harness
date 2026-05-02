@@ -1,0 +1,72 @@
+%erg v1
+Title: Beat housekeeping fixes go to a dedicated branch + distinct PR, verified+merged before continuation
+Status: open
+Created: 2026-05-02
+Author: user
+
+--- log ---
+2026-05-02T07:08Z user created
+
+--- body ---
+## Context
+
+Today the housekeeping skill commits `fix-now` repairs in-place: directly
+to whatever branch the beat happens to be on (typically `main` for nightbeat,
+or the active feature branch interactively). The cycle is:
+
+```
+housekeeping (fix-now → commit on current branch) → pick-ticket → raid
+```
+
+This conflates two scopes: small repo-level repairs (timestamp drift, stale
+ticket lists, doc cross-refs) and the ticket-specific work raid does next.
+Concretely:
+
+- Nightbeat housekeeping commits land on `main` with no review surface.
+- The raid that follows builds on top of that uncommented housekeeping commit.
+- A feature PR ends up carrying unrelated doc edits if housekeeping was run
+  on a feature branch.
+
+Today's sweep (PR #76) showed how this should look instead: STATE.md drift +
+one stale `Blocked-by` rolled up into a single doc-only PR, CI verified
+green, merged, then continuation is free to proceed against a clean main.
+
+## Actions
+
+1. Teach the housekeeping skill (or its beat-mode wrapper) to:
+   - Branch off `origin/main` as `claude/housekeeping-{slug}-{nonce}` before
+     applying fix-now items.
+   - Commit every fix-now finding on that branch (current `chore:
+     housekeeping fixes (sweep)` message stays).
+   - Push and open a PR titled e.g. `chore: housekeeping fixes (sweep) —
+     {one-line summary}` with the action-plan list as the body.
+   - Wait for CI; if all checks green, merge (squash) and pull main.
+   - Only then return control to the rest of the beat (pick-ticket → raid).
+2. If CI fails on the housekeeping PR, abort the rest of the beat and surface
+   the failure — never proceed onto pick-ticket against a known-bad main.
+3. If the action plan is empty (no fix-now items), no branch and no PR;
+   skip straight to step 6 (STATE.md timestamp), as today.
+4. Decide where the timestamp commit lives (housekeeping PR vs separate
+   commit on main). Default: include in the housekeeping PR.
+5. Update `skills/housekeeping/SKILL.md` and `scripts/beat.py` (the
+   `housekeeping_needed` / driver path) to match. Add a beat-mode flag so
+   that interactive `/housekeeping` keeps the simple inline-commit behaviour
+   (no PR overhead for a hand-typed run).
+6. Document the new contract in `STATE.md` and harness-rules where needed.
+
+## Test
+
+- `tests/test_beat.py`: extend with a case where housekeeping has fix-now
+  findings — assert the driver creates a branch, opens a PR, and only calls
+  pick-ticket once main is updated. Mock the GitHub MCP / `gh` boundary.
+- Red first: the new test should fail against current `beat.py` because the
+  driver commits on the live branch with no PR.
+
+## Exit criteria
+
+- Beat-mode housekeeping commits land on a dedicated branch and reach main
+  only via a green-CI PR.
+- Interactive `/housekeeping` is unchanged (no PR detour for hand runs).
+- Empty action plan: no branch, no PR, only the timestamp commit.
+- CI failure on the housekeeping PR aborts the beat.
+- Tests cover both the empty-plan and non-empty-plan paths.
