@@ -40,7 +40,7 @@ Level 4 (Hooks) + raid + `/verify` loop + git-erg tickets + bibliography pipelin
 - 0052 — beat erg edit permission denied
 - 0057 — route .erg mutations through erg binary (blocked by erg binary exposing mutation commands)
 - 0058 — rewrite README with Imperial Dragon voice (remove GSD, new opener)
-- 0059 — simplify pick-ticket to delegate to `erg pick` (blocked by git-erg/0008)
+- 0059 — simplify pick-ticket to delegate to `erg pick`
 - 0061 — sequence parallel agents to stay under budget (corpus discovery fanout crash)
 - 0062 — run nightbeat from a VM (uptime + bypass Gallica 403 blocks)
 - 0063 — enforce erg source read-only in IDH; edits go to git-erg
