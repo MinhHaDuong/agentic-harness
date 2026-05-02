@@ -1,6 +1,6 @@
 # Imperial Dragon Harness — State
 
-Last updated: 2026-04-30T09:30Z
+Last updated: 2026-05-02T00:00Z
 
 ## North star
 
@@ -18,7 +18,7 @@ Level 4 (Hooks) + raid + `/verify` loop + git-erg tickets + bibliography pipelin
 
 **Idle skip**: housekeeping skipped when repo has no commits since last run (ticket 0036 closed).
 
-**erg sweep cache**: `erg ready --json` returns `cache`/`hash` per ticket. `erg sweep-skip` and `erg sweep-write` compute hash server-side. Pick-ticket reads ticket bodies only on cache:miss. 85 pytest + 24 Go tests, all green. Skills resolve erg binary as `${ERG:-erg}` for PATH portability.
+**erg sweep cache**: `erg ready --json` returns `cache`/`hash` per ticket. `erg sweep-skip` and `erg sweep-write` compute hash server-side. Pick-ticket reads ticket bodies only on cache:miss. 85 pytest + 28 Go tests, all green. Skills resolve erg binary as `${ERG:-erg}` for PATH portability.
 
 **git-erg**: pre-commit hooks installed in all projects. CI added (ticket 0009, PR #4 ready to merge).
 
@@ -30,9 +30,6 @@ Level 4 (Hooks) + raid + `/verify` loop + git-erg tickets + bibliography pipelin
 - 0028 — multiproject beat dashboard (Views 1-2)
 - 0029 — beat dashboard blocker graph (blocked by 0028)
 - 0034 — housekeeping: split git-cleanup and ticket-scan into two phases
-- 0037 — fix beat double-pick (raid rc=0 without closing ticket)
-- 0038 — use Haiku for pick-ticket when repo has no recent commits
-- 0040 — skip housekeeping when repo is frozen (overlaps with 0036 — verify scope)
 - 0041 — investigate mid-session context reset between sub-skills
 - 0042 — replace harness-rules with hooks (metaskill panorama finding)
 - 0043 — weekly /fewer-permission-prompts run
@@ -43,7 +40,7 @@ Level 4 (Hooks) + raid + `/verify` loop + git-erg tickets + bibliography pipelin
 - 0052 — beat erg edit permission denied
 - 0057 — route .erg mutations through erg binary (blocked by erg binary exposing mutation commands)
 - 0058 — rewrite README with Imperial Dragon voice (remove GSD, new opener)
-- 0059 — simplify pick-ticket to delegate to `erg pick` (blocked by git-erg/0008)
+- 0059 — simplify pick-ticket to delegate to `erg pick`
 - 0061 — sequence parallel agents to stay under budget (corpus discovery fanout crash)
 - 0062 — run nightbeat from a VM (uptime + bypass Gallica 403 blocks)
 - 0063 — enforce erg source read-only in IDH; edits go to git-erg
@@ -53,6 +50,7 @@ Level 4 (Hooks) + raid + `/verify` loop + git-erg tickets + bibliography pipelin
 - 0067 — rename celebrate→roar and end-session→lair (blocked by 0068)
 - 0068 — two-word canonical names + IDH aliases for all skills
 - 0069 — per-project beat config (.claude/beat.json) with interval_minutes
+- 0070 — /dream skill — autonomous nightly memory consolidation
 - 0054 — [discussion] restore Five-Claws phase announcement at session start
 - 0055 — [discussion] milestone/epic layer above tickets
 - 0056 — [discussion] mid-session pause/resume checkpoints
@@ -69,7 +67,6 @@ None
 - Check aedist PR #301 vs PR #302 (both ticket 0137) — close the older duplicate, merge the latest
 - Retry aedist ticket 0136 (Qwen 3.5 35B) — aborted due to Ollama timeout, not a logic failure
 - Fix chemin-de-voix budget: tickets 0019/0021/0022 hitting $10 cap every run (~$40 wasted overnight)
-- Fix 0037 (beat double-pick) — highest operational risk
 - **doudou setup**: add source line to `~/.bashrc`, install nightbeat systemd units, copy erg binary to all projects
 
 ## Backlog
