@@ -12,6 +12,8 @@ import fcntl
 import json
 import os
 import re
+import secrets
+import shutil
 import signal
 import socket
 import subprocess
@@ -526,21 +528,22 @@ def _git(*args: str, cwd: Path) -> subprocess.CompletedProcess:
 
 
 def _gh_available() -> bool:
-    return (
-        subprocess.run(  # noqa: S603, S607
-            ["sh", "-c", "command -v gh"], capture_output=True, check=False
-        ).returncode
-        == 0
-    )
+    return shutil.which("gh") is not None
 
 
 PR_CHECK_POLL_INTERVAL_S: int = 15
 PR_CHECK_TIMEOUT_S: int = 10 * 60
+PR_CHECK_TRANSIENT_RETRIES: int = 3
 
 
 def _wait_for_pr_checks(branch: str, *, cwd: Path) -> bool:
-    """Block until all PR checks settle. Return True iff all pass."""
+    """Block until all PR checks settle. Return True iff all pass.
+
+    Tolerates a small number of transient `gh pr checks` failures
+    (rate limit, network blip) before giving up.
+    """
     deadline = time.monotonic() + PR_CHECK_TIMEOUT_S
+    transient_failures = 0
     while time.monotonic() < deadline:
         result = subprocess.run(  # noqa: S603, S607
             ["gh", "pr", "checks", branch, "--json", "name,bucket"],
@@ -550,11 +553,20 @@ def _wait_for_pr_checks(branch: str, *, cwd: Path) -> bool:
             cwd=cwd,
         )
         if result.returncode != 0:
-            return False
+            transient_failures += 1
+            if transient_failures > PR_CHECK_TRANSIENT_RETRIES:
+                return False
+            time.sleep(PR_CHECK_POLL_INTERVAL_S)
+            continue
         try:
             checks = json.loads(result.stdout)
         except json.JSONDecodeError:
-            return False
+            transient_failures += 1
+            if transient_failures > PR_CHECK_TRANSIENT_RETRIES:
+                return False
+            time.sleep(PR_CHECK_POLL_INTERVAL_S)
+            continue
+        transient_failures = 0
         if not checks:
             time.sleep(PR_CHECK_POLL_INTERVAL_S)
             continue
@@ -589,7 +601,11 @@ def _housekeeping_phase(project: ProjectConfig) -> str:
         _log("=== housekeeping: cannot resolve origin/main ===")
         return "failed"
 
-    nonce = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    nonce = (
+        datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+        + "-"
+        + secrets.token_hex(2)
+    )
     branch = f"claude/housekeeping-{nonce}"
     if _git("checkout", "-B", branch, base, cwd=path).returncode != 0:
         _log(f"=== housekeeping: failed to create {branch} ===")
@@ -624,11 +640,21 @@ def _housekeeping_phase(project: ProjectConfig) -> str:
     _log(f"=== housekeeping: {n} commit(s) on {branch} ===")
 
     if not (os.environ.get("BEAT_HOUSEKEEPING_PR") == "1" and _gh_available()):
+        # Switch back to main so pick-ticket → raid don't run on the
+        # housekeeping branch and pick up its commits as their base.
+        _git("checkout", "main", cwd=path)
         _log(f"=== housekeeping: deferred — branch {branch} ready for review ===")
         return "deferred"
 
     if _git("push", "-u", "origin", branch, cwd=path).returncode != 0:
         return "failed"
+    log_lines = _git(
+        "log", "--format=- %s", f"{base}..HEAD", cwd=path
+    ).stdout.strip()
+    body = (
+        "Automated nightbeat housekeeping sweep.\n\n## Changes\n\n"
+        + (log_lines or "(none)")
+    )
     pr = subprocess.run(  # noqa: S603, S607
         [
             "gh",
@@ -639,9 +665,9 @@ def _housekeeping_phase(project: ProjectConfig) -> str:
             "--head",
             branch,
             "--title",
-            "chore: housekeeping fixes (sweep)",
+            f"chore: housekeeping fixes (sweep) — {n} commit(s)",
             "--body",
-            "Automated nightbeat housekeeping sweep.",
+            body,
         ],
         capture_output=True,
         text=True,

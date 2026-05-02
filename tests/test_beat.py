@@ -550,20 +550,27 @@ class TestHousekeepingPhase:
         ):
             outcome = beat._housekeeping_phase(beat.ProjectConfig(path=tmp_project))
         assert outcome == "no-changes"
-        # Branch must be created then deleted; main must be checked out
-        subcommands = [call.args[0] for call in mock_git.call_args_list]
-        assert "checkout" in subcommands
-        assert "branch" in subcommands
+        calls = [call.args for call in mock_git.call_args_list]
+        # Branch deletion must specifically run `git branch -D <branch>`
+        delete_calls = [c for c in calls if c[:2] == ("branch", "-D")]
+        assert len(delete_calls) == 1
+        assert delete_calls[0][2].startswith("claude/housekeeping-")
+        # And `git checkout main` must run before the delete
+        assert ("checkout", "main") in [c[:2] for c in calls]
 
     def test_deferred_when_pr_opt_in_off(self, tmp_project, monkeypatch):
         monkeypatch.delenv("BEAT_HOUSEKEEPING_PR", raising=False)
         with (
             patch("beat.housekeeping_needed", return_value=True),
-            patch("beat._git", side_effect=_git_runner(commit_count=2)),
+            patch("beat._git", side_effect=_git_runner(commit_count=2)) as mock_git,
             patch("beat.run_skill", return_value=(0, "")),
         ):
             outcome = beat._housekeeping_phase(beat.ProjectConfig(path=tmp_project))
         assert outcome == "deferred"
+        # Bug regression: deferred must checkout main so pick-ticket / raid
+        # don't run on the housekeeping branch (PR #78 review finding).
+        calls = [call.args for call in mock_git.call_args_list]
+        assert ("checkout", "main") in [c[:2] for c in calls]
 
     def test_merged_when_pr_opt_in_and_ci_green(self, tmp_project, monkeypatch):
         monkeypatch.setenv("BEAT_HOUSEKEEPING_PR", "1")
@@ -573,14 +580,13 @@ class TestHousekeepingPhase:
             if argv and argv[0] == "gh":
                 gh_calls.append(argv)
                 return MagicMock(returncode=0, stdout='[{"bucket":"pass"}]', stderr="")
-            if argv == ["sh", "-c", "command -v gh"]:
-                return MagicMock(returncode=0)
             return MagicMock(returncode=0, stdout="", stderr="")
 
         with (
             patch("beat.housekeeping_needed", return_value=True),
             patch("beat._git", side_effect=_git_runner(commit_count=2)),
             patch("beat.run_skill", return_value=(0, "")),
+            patch("beat._gh_available", return_value=True),
             patch("beat.subprocess.run", side_effect=fake_subprocess_run),
         ):
             outcome = beat._housekeeping_phase(beat.ProjectConfig(path=tmp_project))
@@ -592,8 +598,6 @@ class TestHousekeepingPhase:
         monkeypatch.setenv("BEAT_HOUSEKEEPING_PR", "1")
 
         def fake_subprocess_run(argv, **kwargs):
-            if argv == ["sh", "-c", "command -v gh"]:
-                return MagicMock(returncode=0)
             if argv and argv[:3] == ["gh", "pr", "checks"]:
                 return MagicMock(
                     returncode=0,
@@ -608,10 +612,34 @@ class TestHousekeepingPhase:
             patch("beat.housekeeping_needed", return_value=True),
             patch("beat._git", side_effect=_git_runner(commit_count=1)),
             patch("beat.run_skill", return_value=(0, "")),
+            patch("beat._gh_available", return_value=True),
             patch("beat.subprocess.run", side_effect=fake_subprocess_run),
         ):
             outcome = beat._housekeeping_phase(beat.ProjectConfig(path=tmp_project))
         assert outcome == "ci-failed"
+
+    def test_wait_for_pr_checks_tolerates_transient_failures(self, tmp_path):
+        # First two calls fail (returncode=1), third returns a green check.
+        responses = [
+            MagicMock(returncode=1, stdout="", stderr="rate limited"),
+            MagicMock(returncode=1, stdout="", stderr="network blip"),
+            MagicMock(returncode=0, stdout='[{"bucket":"pass"}]', stderr=""),
+        ]
+        with (
+            patch("beat.subprocess.run", side_effect=responses),
+            patch("beat.time.sleep"),  # don't actually sleep in the test
+        ):
+            result = beat._wait_for_pr_checks("claude/housekeeping-x", cwd=tmp_path)
+        assert result is True
+
+    def test_wait_for_pr_checks_gives_up_after_too_many_failures(self, tmp_path):
+        always_fail = MagicMock(returncode=1, stdout="", stderr="auth error")
+        with (
+            patch("beat.subprocess.run", return_value=always_fail),
+            patch("beat.time.sleep"),
+        ):
+            result = beat._wait_for_pr_checks("claude/housekeeping-x", cwd=tmp_path)
+        assert result is False
 
     def test_skill_timeout_returns_timeout(self, tmp_project):
         with (
