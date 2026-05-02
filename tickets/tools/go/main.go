@@ -11,9 +11,6 @@
 package main
 
 import (
-	"bytes"
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
 	"os"
 	"os/exec"
@@ -236,7 +233,7 @@ var (
 		"Author": true, "Blocked-by": true,
 	}
 	validStatuses = map[string]bool{
-		"open": true, "doing": true, "closed": true, "pending": true,
+		"open": true, "closed": true,
 	}
 	isoDateRE = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}$`)
 	// Filename: 4-digit ID, dash, lowercase kebab slug
@@ -576,149 +573,21 @@ func cmdValidate(args []string) int {
 
 type readyEntry struct {
 	id, title, file string
-	cache           string // "hit", "miss", "skip"
-	hash            string // current body hash (12 hex)
-	scope           string // cached scope (cache:hit only)
-	risk            string // cached risk (cache:hit only)
-	skipReason      string // cached reason (cache:skip only)
 }
 
-// bodyHash returns the SHA-256 of the body content before the first
-// "## Picker assessment" section, hex-encoded, first 12 chars.
-func bodyHash(body string) string {
-	core := body
-	if idx := strings.Index(body, "\n## Picker assessment"); idx >= 0 {
-		core = body[:idx+1]
-	} else if strings.HasPrefix(body, "## Picker assessment") {
-		core = ""
-	}
-	// Normalise trailing newlines so the hash is stable regardless of how many
-	// blank lines precede the assessment section or end the body.
-	core = strings.TrimRight(core, "\n")
-	sum := sha256.Sum256([]byte(core))
-	return hex.EncodeToString(sum[:])[:12]
-}
 
-type sweepCacheInfo struct {
-	cacheType  string // "hit", "miss", "skip"
-	hash       string // 12-hex hash from log line
-	scope      string // e.g. "30m/4f"
-	risk       string // e.g. "low"
-	skipReason string // for skip
-}
-
-// parseSweepCache scans log lines (last-wins) for sweep-skip / sweep-assess /
-// sweep-pick lines and extracts their key:value tokens.
-func parseSweepCache(logLines []string) sweepCacheInfo {
-	for i := len(logLines) - 1; i >= 0; i-- {
-		line := logLines[i]
-		isSkip := strings.Contains(line, " note sweep-skip:")
-		isAssess := strings.Contains(line, " note sweep-assess:") ||
-			strings.Contains(line, " note sweep-pick:")
-		if !isSkip && !isAssess {
-			continue
-		}
-		info := sweepCacheInfo{}
-		if isSkip {
-			info.cacheType = "skip"
-		} else {
-			info.cacheType = "hit"
-		}
-		extractToken := func(key string) string {
-			prefix := key + ":"
-			idx := strings.Index(line, prefix)
-			if idx < 0 {
-				return ""
-			}
-			rest := line[idx+len(prefix):]
-			if sp := strings.IndexByte(rest, ' '); sp >= 0 {
-				return rest[:sp]
-			}
-			return rest
-		}
-		info.hash = extractToken("hash")
-		info.scope = extractToken("scope")
-		info.risk = extractToken("risk")
-		info.skipReason = extractToken("reason")
-		// For sweep-skip with an expires: token, demote to miss if expiry passed.
-		if isSkip {
-			if exp := extractToken("expires"); exp != "" {
-				exp = strings.TrimRight(exp, "Z") // tolerate trailing Z
-				layouts := []string{"2006-01-02T15:04:05", "2006-01-02T15:04", "2006-01-02"}
-				var expTime time.Time
-				for _, lay := range layouts {
-					if t, err := time.Parse(lay, exp); err == nil {
-						expTime = t
-						break
-					}
-				}
-				if !expTime.IsZero() && time.Now().UTC().After(expTime) {
-					info.cacheType = "miss" // expired — force reassessment
-				}
-			}
-		}
-		return info
-	}
-	return sweepCacheInfo{cacheType: "miss"}
-}
-
-// appendToTicket appends logLine before "--- body ---" and bodySection at end
-// of body, writing the result in place.
-func appendToTicket(path, logLine, bodySection string) error {
-	raw, err := os.ReadFile(path)
-	if err != nil {
-		return err
-	}
-	sep := []byte("--- body ---\n")
-	idx := bytes.Index(raw, sep)
-	if idx < 0 {
-		return fmt.Errorf("%s: no --- body --- separator", path)
-	}
-	beforeBody := raw[:idx]
-	bodyContent := raw[idx+len(sep):]
-
-	if !bytes.HasSuffix(beforeBody, []byte("\n")) {
-		beforeBody = append(beforeBody, '\n')
-	}
-	logAppend := []byte(logLine + "\n")
-
-	if !bytes.HasSuffix(bodyContent, []byte("\n")) {
-		bodyContent = append(bodyContent, '\n')
-	}
-	bodyAppend := []byte(bodySection)
-
-	result := make([]byte, 0, len(beforeBody)+len(logAppend)+len(sep)+len(bodyContent)+len(bodyAppend))
-	result = append(result, beforeBody...)
-	result = append(result, logAppend...)
-	result = append(result, sep...)
-	result = append(result, bodyContent...)
-	result = append(result, bodyAppend...)
-	return os.WriteFile(path, result, 0644)
-}
-
-func loadWip() map[string]string {
-	wip := make(map[string]string)
-	cmd := exec.Command("git", "rev-parse", "--git-common-dir")
+// hasBranch returns true if any local or remote branch name contains the
+// 4-digit ticket ID. Remote check is best-effort: failures are treated as
+// no remote claim so the beat is never blocked by a network issue.
+func hasBranch(id string) bool {
+	cmd := exec.Command("git", "branch", "--list", "*"+id+"*")
 	out, err := cmd.Output()
-	if err != nil {
-		return wip
+	if err == nil && strings.TrimSpace(string(out)) != "" {
+		return true
 	}
-	wipDir := filepath.Join(strings.TrimSpace(string(out)), "ticket-wip")
-	entries, err := os.ReadDir(wipDir)
-	if err != nil {
-		return wip
-	}
-	for _, e := range entries {
-		if e.IsDir() || filepath.Ext(e.Name()) != ".wip" {
-			continue
-		}
-		tid := strings.TrimSuffix(e.Name(), ".wip")
-		data, err := os.ReadFile(filepath.Join(wipDir, e.Name()))
-		if err == nil {
-			wip[tid] = strings.TrimSpace(string(data))
-		}
-	}
-	return wip
+	cmd = exec.Command("git", "branch", "-r", "--list", "*"+id+"*")
+	out, err = cmd.Output()
+	return err == nil && strings.TrimSpace(string(out)) != ""
 }
 
 func cmdReady(args []string) int {
@@ -752,8 +621,6 @@ func cmdReady(args []string) int {
 		}
 	}
 
-	wip := loadWip()
-
 	var warnings []string
 	var ready []readyEntry
 	openCount := 0
@@ -765,16 +632,15 @@ func cmdReady(args []string) int {
 		}
 		openCount++
 
-		// Exclude WIP-claimed tickets
 		tid := t.FilenameID()
-		if _, claimed := wip[tid]; claimed {
+		if hasBranch(tid) {
 			continue
 		}
 
 		blocked := false
 		for _, refID := range t.BlockedBy() {
 			if strings.HasPrefix(refID, "gh#") {
-				continue // GitHub refs treated as satisfied offline
+				continue
 			}
 			refStatus, found := statusByID[refID]
 			if !found {
@@ -786,18 +652,7 @@ func cmdReady(args []string) int {
 			}
 		}
 		if !blocked {
-			h := bodyHash(t.Body)
-			cached := parseSweepCache(t.LogLines)
-			cacheType := "miss"
-			scope, risk, skipReason := "", "", ""
-			if cached.hash == h {
-				cacheType = cached.cacheType
-				scope = cached.scope
-				risk = cached.risk
-				skipReason = cached.skipReason
-			}
-			ready = append(ready, readyEntry{tid, t.Title(), t.Filename(),
-				cacheType, h, scope, risk, skipReason})
+			ready = append(ready, readyEntry{tid, t.Title(), t.Filename()})
 		}
 	}
 
@@ -815,20 +670,8 @@ func cmdReady(args []string) int {
 				if i == len(ready)-1 {
 					comma = ""
 				}
-				extra := fmt.Sprintf(",\n    \"cache\": \"%s\",\n    \"hash\": \"%s\"",
-					jsonEscape(r.cache), jsonEscape(r.hash))
-				switch r.cache {
-				case "hit":
-					extra += fmt.Sprintf(",\n    \"scope\": \"%s\",\n    \"risk\": \"%s\"",
-						jsonEscape(r.scope), jsonEscape(r.risk))
-				case "skip":
-					extra += fmt.Sprintf(",\n    \"skip_reason\": \"%s\"", jsonEscape(r.skipReason))
-				}
-				if w, ok := wip[r.id]; ok {
-					extra += fmt.Sprintf(",\n    \"wip\": \"%s\"", jsonEscape(w))
-				}
-				fmt.Printf("  {\n    \"id\": \"%s\",\n    \"title\": \"%s\",\n    \"file\": \"%s\"%s\n  }%s\n",
-					jsonEscape(r.id), jsonEscape(r.title), jsonEscape(r.file), extra, comma)
+				fmt.Printf("  {\n    \"id\": \"%s\",\n    \"title\": \"%s\",\n    \"file\": \"%s\"\n  }%s\n",
+					jsonEscape(r.id), jsonEscape(r.title), jsonEscape(r.file), comma)
 			}
 			fmt.Println("]")
 		}
@@ -839,16 +682,12 @@ func cmdReady(args []string) int {
 			} else if openCount == 0 {
 				fmt.Printf("All %d tickets are closed.\n", len(tickets))
 			} else {
-				fmt.Printf("%d open tickets, all blocked.\n", openCount)
+				fmt.Printf("%d open tickets, all blocked or claimed.\n", openCount)
 			}
 		} else {
 			fmt.Printf("Ready tickets (%d):\n", len(ready))
 			for _, r := range ready {
-				suffix := ""
-				if w, ok := wip[r.id]; ok {
-					suffix = "  (wip: " + w + ")"
-				}
-				fmt.Printf("  %-8s %-40s %s%s\n", r.id, r.file, r.title, suffix)
+				fmt.Printf("  %-8s %-40s %s\n", r.id, r.file, r.title)
 			}
 		}
 	}
@@ -1065,8 +904,6 @@ func cmdGraph(args []string) int {
 		}
 	}
 
-	wip := loadWip()
-
 	// Build children map (reverse of Blocked-by): if B is blocked by A, then A -> B
 	children := make(map[string][]string)
 	hasParent := make(map[string]bool)
@@ -1091,11 +928,10 @@ func cmdGraph(args []string) int {
 	// Determine annotation for a ticket
 	annotate := func(id string) string {
 		status := statusByID[id]
-		if _, claimed := wip[id]; claimed {
-			return status + ", claimed"
-		}
 		if status == "open" {
-			// Check if blocked
+			if hasBranch(id) {
+				return "open, claimed"
+			}
 			t := byID[id]
 			for _, ref := range t.BlockedBy() {
 				if strings.HasPrefix(ref, "gh#") {
@@ -1266,125 +1102,6 @@ func sortedKeys2[V any](m map[string]V) []string {
 	return keys
 }
 
-// ---------------------------------------------------------------------------
-// sweep-write — write picker assessment only when body changed
-// ---------------------------------------------------------------------------
-
-// cmdSweepSkip writes a sweep-skip log line to a ticket file only when the
-// current body hash differs from the cached sweep-skip hash.
-// Usage: erg sweep-skip <ticket.erg> <reason> [expires:<ISO8601>]
-// Outputs "WROTE" or "CACHED" to stdout.
-func cmdSweepSkip(args []string) int {
-	if len(args) < 2 {
-		fmt.Fprintln(os.Stderr, "Usage: erg sweep-skip <ticket.erg> <reason> [expires:<ISO8601>]")
-		return 1
-	}
-	path := args[0]
-	reason := args[1]
-	expires := ""
-	for _, a := range args[2:] {
-		if strings.HasPrefix(a, "expires:") {
-			expires = a[8:]
-		}
-	}
-
-	t := parseErg(path)
-	if !t.HasBody {
-		fmt.Fprintf(os.Stderr, "error: %s has no --- body --- section\n", path)
-		return 1
-	}
-
-	hash := bodyHash(t.Body)
-	cached := parseSweepCache(t.LogLines)
-	if cached.cacheType == "skip" && cached.hash == hash {
-		fmt.Println("CACHED")
-		return 0
-	}
-
-	ts := time.Now().UTC().Format("2006-01-02T15:04Z")
-	logLine := fmt.Sprintf("%s claude note sweep-skip: %s hash:%s", ts, reason, hash)
-	if expires != "" {
-		logLine += " expires:" + expires
-	}
-
-	raw, err := os.ReadFile(path)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", err)
-		return 1
-	}
-	sep := []byte("--- body ---\n")
-	idx := bytes.Index(raw, sep)
-	if idx < 0 {
-		fmt.Fprintf(os.Stderr, "error: %s has no --- body --- separator\n", path)
-		return 1
-	}
-	// Build result in a fresh buffer. Do NOT take a sub-slice of raw and
-	// append into it: os.ReadFile returns a slice with cap > len, so
-	// `raw[:idx]` shares the backing array and a subsequent append
-	// silently overwrites the body — corrupting it on disk.
-	logAppend := []byte(logLine + "\n")
-	bodyContent := raw[idx+len(sep):]
-	result := make([]byte, 0, idx+1+len(logAppend)+len(sep)+len(bodyContent))
-	result = append(result, raw[:idx]...)
-	if !bytes.HasSuffix(result, []byte("\n")) {
-		result = append(result, '\n')
-	}
-	result = append(result, logAppend...)
-	result = append(result, sep...)
-	result = append(result, bodyContent...)
-	if err := os.WriteFile(path, result, 0644); err != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", err)
-		return 1
-	}
-	fmt.Println("WROTE")
-	return 0
-}
-
-// cmdSweepWrite writes a picker assessment (body section + log line) to a
-// ticket file only when the current body hash differs from the cached one.
-// Usage: erg sweep-write <ticket.erg> <picked|not-picked> <scope> <risk> <reason...>
-// Outputs "WROTE" or "CACHED" to stdout.
-func cmdSweepWrite(args []string) int {
-	if len(args) < 5 {
-		fmt.Fprintln(os.Stderr, "Usage: erg sweep-write <ticket.erg> <picked|not-picked> <scope> <risk> <reason...>")
-		return 1
-	}
-	path := args[0]
-	decision := args[1]
-	scope := args[2]
-	risk := args[3]
-	reason := strings.Join(args[4:], " ")
-
-	t := parseErg(path)
-	if !t.HasBody {
-		fmt.Fprintf(os.Stderr, "error: %s has no --- body --- section\n", path)
-		return 1
-	}
-
-	hash := bodyHash(t.Body)
-	cached := parseSweepCache(t.LogLines)
-	if cached.hash == hash {
-		fmt.Println("CACHED")
-		return 0
-	}
-
-	verb := "sweep-assess"
-	if decision == "picked" {
-		verb = "sweep-pick"
-	}
-	ts := time.Now().UTC().Format("2006-01-02T15:04Z")
-	logLine := fmt.Sprintf("%s claude note %s: %s hash:%s scope:%s risk:%s",
-		ts, verb, decision, hash, scope, risk)
-	assessSection := fmt.Sprintf("## Picker assessment %s\n**Decision:** %s\n**Scope:** %s\n**Risk:** %s\n**Reason:** %s\n",
-		ts, decision, scope, risk, reason)
-
-	if err := appendToTicket(path, logLine, assessSection); err != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", err)
-		return 1
-	}
-	fmt.Println("WROTE")
-	return 0
-}
 
 // ---------------------------------------------------------------------------
 // Main dispatch
@@ -1394,15 +1111,11 @@ func printUsage() {
 	fmt.Fprintln(os.Stderr, "Usage: erg <command> [args...]")
 	fmt.Fprintln(os.Stderr)
 	fmt.Fprintln(os.Stderr, "Commands:")
-	fmt.Fprintf(os.Stderr, "  validate [dir|files...]   Validate %%erg v1 files\n")
-	fmt.Fprintln(os.Stderr, "  ready [dir] [--json]      Show tickets ready for work")
+	fmt.Fprintf(os.Stderr, "  validate [dir|files...]              Validate %%erg v1 files\n")
+	fmt.Fprintln(os.Stderr, "  ready [dir] [--json]                Show tickets ready for work")
 	fmt.Fprintln(os.Stderr, "  archive [dir] [--days N] [--execute]  Archive old closed tickets")
-	fmt.Fprintln(os.Stderr, "  graph [dir] [--json]      Show ticket dependency DAG")
-	fmt.Fprintln(os.Stderr, "  next-id [dir]             Print the next available ticket ID")
-	fmt.Fprintln(os.Stderr, "  sweep-skip <file> <reason> [expires:<ISO8601>]")
-	fmt.Fprintln(os.Stderr, "                            Write sweep-skip log line if body changed")
-	fmt.Fprintln(os.Stderr, "  sweep-write <file> <picked|not-picked> <scope> <risk> <reason>")
-	fmt.Fprintln(os.Stderr, "                            Write picker assessment if body changed")
+	fmt.Fprintln(os.Stderr, "  graph [dir] [--json]                Show ticket dependency DAG")
+	fmt.Fprintln(os.Stderr, "  next-id [dir]                       Print the next available ticket ID")
 }
 
 func main() {
@@ -1426,10 +1139,6 @@ func main() {
 		exitCode = cmdGraph(rest)
 	case "next-id":
 		exitCode = cmdNextID(rest)
-	case "sweep-skip":
-		exitCode = cmdSweepSkip(rest)
-	case "sweep-write":
-		exitCode = cmdSweepWrite(rest)
 	case "-h", "--help", "help":
 		printUsage()
 		exitCode = 0

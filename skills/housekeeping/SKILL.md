@@ -13,6 +13,16 @@ Run full repo housekeeping and act on every finding.
 
 1. **Git sync.** `git fetch --all --prune --quiet` then `git gc --auto`. Log if working tree is dirty (do not abort).
 
+1a. **Beat-skip sweep.** If `.git/beat-skip.json` exists, remove entries where
+    `until` is present and `until < now`. Rewrite the file in place. This
+    prevents the skip list from accumulating expired entries across beats.
+
+1b. **Stale-branch check.** List local branches whose name contains a 4-digit
+    ticket ID (`git branch --list`). For each, check if the ticket is already
+    `closed` and the branch has no commits beyond `main` in the last 24 h.
+    Report these as candidates for cleanup but do not auto-delete — list them
+    in the housekeeping summary for human review.
+
 2. **Healthcheck.** Invoke /healthcheck. Parse the Action plan.
 
 3. **Fix `fix-now` items.** Apply every `fix-now` item inline. If any fixes were

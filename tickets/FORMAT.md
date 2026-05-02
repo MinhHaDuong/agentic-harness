@@ -2,7 +2,7 @@
 
 ## Overview
 
-Local ticket system for agent coordination across worktrees on one machine.
+Local ticket system for agent coordination across worktrees and machines.
 Not a replacement for GitHub Issues — those handle inter-agent and human coordination.
 Tickets are committed to git and travel with the repo.
 
@@ -52,7 +52,7 @@ validator rejects files missing either one).
 | Header | Required | Type | Values |
 |--------|----------|------|--------|
 | `Title` | yes | string | Short imperative sentence |
-| `Status` | yes | enum | `open`, `doing`, `closed`, `pending` |
+| `Status` | yes | enum | `open`, `closed` |
 | `Created` | yes | date | `YYYY-MM-DD` |
 | `Author` | yes | string | Agent or human identifier |
 | `Blocked-by` | no | ref | Ticket ID or `gh#N` (repeatable) |
@@ -61,17 +61,15 @@ No other headers are valid in v1. No `X-` extensions. If v2 needs new
 headers, it declares `%ticket v2` and extends the set.
 
 **Status values:**
-- `open` — available for work.
-- `doing` — in progress.
+- `open` — available for work (subject to branch-as-claim check).
 - `closed` — completed or cancelled.
-- `pending` — awaiting external input (e.g., review). Excluded from ready query.
 
 **`Blocked-by` references:**
 - A 4-digit ID (e.g., `0041`) refers to a local ticket.
 - `gh#N` refers to a GitHub issue. Resolved via API when online, treated as
   satisfied (non-blocking) when offline.
 - Repeatable: one `Blocked-by:` line per dependency.
-- A blocker must be `closed` to unblock. `doing` and `pending` still block.
+- A blocker must be `closed` to unblock.
 
 ### ID assignment
 
@@ -131,21 +129,79 @@ Definition of done.
 Not enforced by the validator. Agents are encouraged to follow the convention
 but the body is structurally unconstrained.
 
-## Coordination is out of scope
+## Ticket state model
 
-Cross-worktree deconfliction is not the validator's concern. The branch is
-the WIP signal: an agent starts work by creating a branch whose name contains
-the ticket ID. Two agents may pick the same ticket; they diverge onto
-different branches and the merge sorts it out.
+### Claim signal: branch-as-claim
 
-### Ready query
+A ticket is **in progress** (claimed) iff a branch whose name contains the
+4-digit ticket ID exists. No `.wip` files. No `Status: doing`.
 
-A ticket is **ready** when:
-- `Status: open` (not `doing`, not `closed`, not `pending`)
+```
+git branch --list "*{id}*"       # local — always authoritative
+git branch -r --list "*{id}*"   # remote — cross-machine, best-effort
+```
+
+Branch naming is free-form as long as the ID appears somewhere:
+`fix/0066-...`, `0066-state-model`, `worktree-0066-foo` all work.
+
+**Offline safety:** if the remote check fails, treat as "no remote claim"
+and continue. A beat is never blocked by a network failure.
+
+### State tuple and valid states
+
+State: `(Status, local_branch, remote_branch)`
+where `local_branch` = any local branch name contains the ID,
+`remote_branch` = same for remote (best-effort).
+
+| Status | local | remote | Name | Meaning |
+|--------|-------|--------|------|---------|
+| open | — | — | AVAILABLE | Ready to pick |
+| open | ✓ | — | CLAIMED | Active, not yet pushed |
+| open | ✓ | ✓ | IN_PROGRESS | Active, cross-machine visible |
+| open | — | ✓ | REMOTE_CLAIM | Another machine working; do not pick |
+| closed | — | — | DONE | Complete, branches cleaned |
+| closed | ✓/— | ✓/— | POST_MERGE | Branch cleanup pending; transient, benign |
+
+### Coherence rules
+
+- **R1:** Claimable iff `Status: open` AND no branch with ID exists (local or remote).
+- **R2:** Done iff `Status: closed`. Branch cleanup is housekeeping, not a
+  correctness condition.
+- **R3:** All scheduling state lives in beat config (`{project}/.git/beat-skip.json`).
+  No scheduling fields in `.erg` files.
+- **R4:** Triage notes are plain `note` log entries. No hash or expiry fields.
+- **R5:** `Blocked-by:` encodes dependency; beat config encodes scheduling.
+  Both are orthogonal to Status.
+
+### Beat-config skip list
+
+Scheduling state (cooldowns, scope-too-large flags, needs-human markers)
+lives in `{project_dir}/.git/beat-skip.json` — machine-local, ephemeral, not
+committed.
+
+```json
+{
+  "version": 1,
+  "entries": [
+    { "id": "0028", "until": "2026-05-03T08:00Z", "reason": "scope-too-large" },
+    { "id": "0041", "until": "2026-05-02T22:00Z", "reason": "cooldown-recent-pick" },
+    { "id": "0055", "reason": "needs-human: milestone design needs user decision" }
+  ]
+}
+```
+
+`until` absent or null → skip indefinitely (use for needs-human cases).
+Housekeeping sweeps expired entries on each run.
+
+## Ready query
+
+A ticket is **ready** (pickable) when:
+- `Status: open`
+- No local or remote branch name contains the ticket ID
 - Every `Blocked-by` local ref points to a `Status: closed` ticket
-- Every `Blocked-by: gh#N` is either resolved via API or treated as satisfied (offline)
+- Not in the beat-config skip list with a future `until` timestamp
 
-### Archive criteria
+## Archive criteria
 
 A ticket is **archivable** when:
 - `Status: closed`
@@ -160,7 +216,7 @@ The Go validator enforces:
 1. Magic first line is `%erg v1` (reject unknown versions)
 2. All required headers present
 3. No unknown headers
-4. `Status` value is in the enum (`open`, `doing`, `closed`, `pending`)
+4. `Status` value is in the enum (`open`, `closed`)
 5. `Created` is a valid ISO date (`YYYY-MM-DD`)
 6. Filename matches `NNNN-{slug}.erg` pattern (4-digit ID, ASCII slug)
 7. No duplicate IDs across `tickets/` and `tickets/archive/`
@@ -174,7 +230,8 @@ The Go validator enforces:
 | Concern | Tool |
 |---------|------|
 | Local work organization | `.erg` files |
-| Cross-worktree deconfliction | branch names (the branch is the WIP signal) |
+| In-progress signal | branch names (contains ticket ID) |
+| Cross-machine coordination | remote branches + `Blocked-by: gh#N` |
 | Multi-agent coordination | GitHub Issues |
 | Public visibility, review | GitHub Issues + PRs |
 
