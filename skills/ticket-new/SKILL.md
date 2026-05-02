@@ -15,7 +15,8 @@ from a conversation. Extract the intent and normalize to `%erg v1`.
 
 1. Determine the next ID:
    ```bash
-   erg next-id tickets/
+   ERG=${ERG:-tickets/tools/go/erg}
+   $ERG next-id tickets/
    ```
 
 2. Choose a slug: lowercase kebab-case, ASCII only (`[a-z0-9-]`), derived from the title.
