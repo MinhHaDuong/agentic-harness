@@ -519,24 +519,170 @@ def _pick_project() -> tuple[int, ProjectConfig]:
     return count, PROJECTS[idx]
 
 
-def _raid(project: ProjectConfig) -> tuple[str, str | None]:
-    """Run the pick→raid sequence; return (outcome, ticket_id)."""
-    ticket_id: str | None = None
-    path = project.path
+def _git(*args: str, cwd: Path) -> subprocess.CompletedProcess:
+    return subprocess.run(  # noqa: S603
+        ["git", *args], capture_output=True, text=True, check=False, cwd=cwd
+    )
 
-    # Housekeeping (conditional)
-    if housekeeping_needed(path):
-        _log(f"=== housekeeping: running {_now_iso()} ===")
+
+def _gh_available() -> bool:
+    return (
+        subprocess.run(  # noqa: S603, S607
+            ["sh", "-c", "command -v gh"], capture_output=True, check=False
+        ).returncode
+        == 0
+    )
+
+
+PR_CHECK_POLL_INTERVAL_S: int = 15
+PR_CHECK_TIMEOUT_S: int = 10 * 60
+
+
+def _wait_for_pr_checks(branch: str, *, cwd: Path) -> bool:
+    """Block until all PR checks settle. Return True iff all pass."""
+    deadline = time.monotonic() + PR_CHECK_TIMEOUT_S
+    while time.monotonic() < deadline:
+        result = subprocess.run(  # noqa: S603, S607
+            ["gh", "pr", "checks", branch, "--json", "name,bucket"],
+            capture_output=True,
+            text=True,
+            check=False,
+            cwd=cwd,
+        )
+        if result.returncode != 0:
+            return False
+        try:
+            checks = json.loads(result.stdout)
+        except json.JSONDecodeError:
+            return False
+        if not checks:
+            time.sleep(PR_CHECK_POLL_INTERVAL_S)
+            continue
+        buckets = {c.get("bucket") for c in checks}
+        if "pending" in buckets:
+            time.sleep(PR_CHECK_POLL_INTERVAL_S)
+            continue
+        return buckets <= {"pass"}
+    return False
+
+
+def _housekeeping_phase(project: ProjectConfig) -> str:
+    """Run housekeeping on a dedicated branch; PR+merge if commits land.
+
+    Returns one of:
+      "skipped"    — housekeeping_needed was False
+      "no-changes" — skill ran clean, produced no commits
+      "merged"     — PR opened, CI green, squash-merged into main
+      "deferred"   — commits exist locally; PR/merge automation off (no gh
+                     or BEAT_HOUSEKEEPING_PR != 1) — branch left for human
+      "ci-failed"  — PR opened but at least one check failed
+      "timeout"    — skill timed out
+      "failed"     — git/gh/skill error
+    """
+    path = project.path
+    if not housekeeping_needed(path):
+        _log(f"=== housekeeping: skipped {_now_iso()} ===")
+        return "skipped"
+
+    base = _git("rev-parse", "origin/main", cwd=path).stdout.strip()
+    if not base:
+        _log("=== housekeeping: cannot resolve origin/main ===")
+        return "failed"
+
+    nonce = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    branch = f"claude/housekeeping-{nonce}"
+    if _git("checkout", "-B", branch, base, cwd=path).returncode != 0:
+        _log(f"=== housekeeping: failed to create {branch} ===")
+        return "failed"
+
+    _log(f"=== housekeeping: running on {branch} {_now_iso()} ===")
+    os.environ["BEAT_HOUSEKEEPING_BRANCH"] = branch
+    try:
         hk_rc, _ = run_skill(
             "/housekeeping",
             budget=project.budget_housekeeping,
             timeout_s=HOUSEKEEPING_TIMEOUT_S,
             cwd=path,
         )
-        suffix = "timeout" if hk_rc == TIMEOUT_EXIT_CODE else f"rc={hk_rc}"
-        _log(f"=== housekeeping: {suffix if hk_rc != 0 else 'done'} {_now_iso()} ===")
-    else:
-        _log(f"=== housekeeping: skipped {_now_iso()} ===")
+    finally:
+        os.environ.pop("BEAT_HOUSEKEEPING_BRANCH", None)
+
+    if hk_rc == TIMEOUT_EXIT_CODE:
+        _log(f"=== housekeeping: timeout — {branch} left in place {_now_iso()} ===")
+        return "timeout"
+    if hk_rc != 0:
+        _log(f"=== housekeeping: rc={hk_rc} on {branch} {_now_iso()} ===")
+        return "failed"
+
+    n = _git("rev-list", "--count", f"{base}..HEAD", cwd=path).stdout.strip() or "0"
+    if int(n) == 0:
+        _log("=== housekeeping: no commits, deleting branch ===")
+        _git("checkout", "main", cwd=path)
+        _git("branch", "-D", branch, cwd=path)
+        return "no-changes"
+
+    _log(f"=== housekeeping: {n} commit(s) on {branch} ===")
+
+    if not (os.environ.get("BEAT_HOUSEKEEPING_PR") == "1" and _gh_available()):
+        _log(f"=== housekeeping: deferred — branch {branch} ready for review ===")
+        return "deferred"
+
+    if _git("push", "-u", "origin", branch, cwd=path).returncode != 0:
+        return "failed"
+    pr = subprocess.run(  # noqa: S603, S607
+        [
+            "gh",
+            "pr",
+            "create",
+            "--base",
+            "main",
+            "--head",
+            branch,
+            "--title",
+            "chore: housekeeping fixes (sweep)",
+            "--body",
+            "Automated nightbeat housekeeping sweep.",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+        cwd=path,
+    )
+    if pr.returncode != 0:
+        _log(f"=== housekeeping: gh pr create failed: {pr.stderr.strip()} ===")
+        return "failed"
+
+    if not _wait_for_pr_checks(branch, cwd=path):
+        _log(f"=== housekeeping: CI red on {branch} — aborting beat ===")
+        return "ci-failed"
+
+    merge = subprocess.run(  # noqa: S603, S607
+        ["gh", "pr", "merge", branch, "--squash", "--delete-branch"],
+        capture_output=True,
+        text=True,
+        check=False,
+        cwd=path,
+    )
+    if merge.returncode != 0:
+        _log(f"=== housekeeping: gh pr merge failed: {merge.stderr.strip()} ===")
+        return "failed"
+
+    _git("checkout", "main", cwd=path)
+    _git("pull", "--ff-only", "origin", "main", cwd=path)
+    _log(f"=== housekeeping: merged {branch} {_now_iso()} ===")
+    return "merged"
+
+
+def _raid(project: ProjectConfig) -> tuple[str, str | None]:
+    """Run the pick→raid sequence; return (outcome, ticket_id)."""
+    ticket_id: str | None = None
+    path = project.path
+
+    # Housekeeping (conditional). Aborts beat on failure/timeout/CI-red so
+    # pick-ticket → raid never runs against a known-bad main.
+    hk_outcome = _housekeeping_phase(project)
+    if hk_outcome in ("failed", "timeout", "ci-failed"):
+        return "aborted", None
 
     # Pick ticket
     hostname = socket.gethostname()

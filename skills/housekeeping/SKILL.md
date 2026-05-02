@@ -30,3 +30,15 @@ Run full repo housekeeping and act on every finding.
 6. **Timestamp.** Update STATE.md to note the housekeeping run UTC date and time, commit it.
 
 7. **Report.** Summarize what you did.
+
+## Beat mode
+
+When `BEAT_HOUSEKEEPING_BRANCH` is set in the environment, you are running
+under `beat.py` on a dedicated `claude/housekeeping-*` branch already cut
+from `origin/main`. Behaviour stays the same — commit fix-now items and the
+timestamp as usual. `beat.py` handles push, PR creation, CI verification,
+and squash-merge once you exit; do NOT push or open a PR yourself. The
+no-push guard is relaxed for that branch only.
+
+If `BEAT_HOUSEKEEPING_BRANCH` is unset (interactive `/housekeeping`), commit
+in place as before — no PR detour for hand-typed runs.

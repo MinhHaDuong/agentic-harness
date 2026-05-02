@@ -486,6 +486,7 @@ class TestRaid:
 
         with (
             patch("beat.housekeeping_needed", return_value=True),
+            patch("beat._git", side_effect=_git_runner(commit_count=0)),
             patch("beat.run_skill", side_effect=fake_run_skill),
         ):
             beat._raid(beat.ProjectConfig(path=tmp_project))
@@ -506,6 +507,140 @@ class TestRaid:
             beat._raid(beat.ProjectConfig(path=tmp_project))
 
         assert not any("housekeeping" in c for c in calls)
+
+
+# ── housekeeping phase: dedicated branch + PR flow (ticket 0072) ──────────────
+
+
+def _git_runner(commit_count: int):
+    """Return a side_effect for _git that yields N new commits ahead of base."""
+
+    def runner(*args, cwd):
+        # First arg is the git subcommand
+        sub = args[0] if args else ""
+        if sub == "rev-parse":
+            return MagicMock(returncode=0, stdout="basesha\n", stderr="")
+        if sub == "rev-list":
+            return MagicMock(returncode=0, stdout=f"{commit_count}\n", stderr="")
+        return MagicMock(returncode=0, stdout="", stderr="")
+
+    return runner
+
+
+class TestHousekeepingPhase:
+    """Ticket 0072: beat-mode housekeeping runs on a dedicated branch and
+    only reaches main via a green-CI PR."""
+
+    def test_skipped_when_not_needed(self, tmp_project):
+        with (
+            patch("beat.housekeeping_needed", return_value=False),
+            patch("beat._git") as mock_git,
+            patch("beat.run_skill") as mock_skill,
+        ):
+            outcome = beat._housekeeping_phase(beat.ProjectConfig(path=tmp_project))
+        assert outcome == "skipped"
+        mock_git.assert_not_called()
+        mock_skill.assert_not_called()
+
+    def test_no_changes_deletes_branch(self, tmp_project):
+        with (
+            patch("beat.housekeeping_needed", return_value=True),
+            patch("beat._git", side_effect=_git_runner(commit_count=0)) as mock_git,
+            patch("beat.run_skill", return_value=(0, "")),
+        ):
+            outcome = beat._housekeeping_phase(beat.ProjectConfig(path=tmp_project))
+        assert outcome == "no-changes"
+        # Branch must be created then deleted; main must be checked out
+        subcommands = [call.args[0] for call in mock_git.call_args_list]
+        assert "checkout" in subcommands
+        assert "branch" in subcommands
+
+    def test_deferred_when_pr_opt_in_off(self, tmp_project, monkeypatch):
+        monkeypatch.delenv("BEAT_HOUSEKEEPING_PR", raising=False)
+        with (
+            patch("beat.housekeeping_needed", return_value=True),
+            patch("beat._git", side_effect=_git_runner(commit_count=2)),
+            patch("beat.run_skill", return_value=(0, "")),
+        ):
+            outcome = beat._housekeeping_phase(beat.ProjectConfig(path=tmp_project))
+        assert outcome == "deferred"
+
+    def test_merged_when_pr_opt_in_and_ci_green(self, tmp_project, monkeypatch):
+        monkeypatch.setenv("BEAT_HOUSEKEEPING_PR", "1")
+        gh_calls: list[list[str]] = []
+
+        def fake_subprocess_run(argv, **kwargs):
+            if argv and argv[0] == "gh":
+                gh_calls.append(argv)
+                return MagicMock(returncode=0, stdout='[{"bucket":"pass"}]', stderr="")
+            if argv == ["sh", "-c", "command -v gh"]:
+                return MagicMock(returncode=0)
+            return MagicMock(returncode=0, stdout="", stderr="")
+
+        with (
+            patch("beat.housekeeping_needed", return_value=True),
+            patch("beat._git", side_effect=_git_runner(commit_count=2)),
+            patch("beat.run_skill", return_value=(0, "")),
+            patch("beat.subprocess.run", side_effect=fake_subprocess_run),
+        ):
+            outcome = beat._housekeeping_phase(beat.ProjectConfig(path=tmp_project))
+        assert outcome == "merged"
+        assert any("create" in c for c in gh_calls)
+        assert any("merge" in c for c in gh_calls)
+
+    def test_ci_failed_blocks_merge(self, tmp_project, monkeypatch):
+        monkeypatch.setenv("BEAT_HOUSEKEEPING_PR", "1")
+
+        def fake_subprocess_run(argv, **kwargs):
+            if argv == ["sh", "-c", "command -v gh"]:
+                return MagicMock(returncode=0)
+            if argv and argv[:3] == ["gh", "pr", "checks"]:
+                return MagicMock(
+                    returncode=0,
+                    stdout='[{"name":"validate","bucket":"fail"}]',
+                    stderr="",
+                )
+            if argv and argv[:3] == ["gh", "pr", "create"]:
+                return MagicMock(returncode=0, stdout="", stderr="")
+            return MagicMock(returncode=0, stdout="", stderr="")
+
+        with (
+            patch("beat.housekeeping_needed", return_value=True),
+            patch("beat._git", side_effect=_git_runner(commit_count=1)),
+            patch("beat.run_skill", return_value=(0, "")),
+            patch("beat.subprocess.run", side_effect=fake_subprocess_run),
+        ):
+            outcome = beat._housekeeping_phase(beat.ProjectConfig(path=tmp_project))
+        assert outcome == "ci-failed"
+
+    def test_skill_timeout_returns_timeout(self, tmp_project):
+        with (
+            patch("beat.housekeeping_needed", return_value=True),
+            patch("beat._git", side_effect=_git_runner(commit_count=0)),
+            patch("beat.run_skill", return_value=(beat.TIMEOUT_EXIT_CODE, "")),
+        ):
+            outcome = beat._housekeeping_phase(beat.ProjectConfig(path=tmp_project))
+        assert outcome == "timeout"
+
+    def test_raid_aborts_on_ci_failed(self, tmp_project):
+        with patch("beat._housekeeping_phase", return_value="ci-failed"):
+            outcome, ticket = beat._raid(beat.ProjectConfig(path=tmp_project))
+        assert outcome == "aborted"
+        assert ticket is None
+
+    def test_raid_aborts_on_housekeeping_timeout(self, tmp_project):
+        with patch("beat._housekeeping_phase", return_value="timeout"):
+            outcome, ticket = beat._raid(beat.ProjectConfig(path=tmp_project))
+        assert outcome == "aborted"
+        assert ticket is None
+
+    def test_raid_continues_on_deferred(self, tmp_project):
+        with (
+            patch("beat._housekeeping_phase", return_value="deferred"),
+            patch("beat.run_skill", return_value=(0, "IDLE: empty")),
+        ):
+            outcome, _ = beat._raid(beat.ProjectConfig(path=tmp_project))
+        assert outcome == "idle"  # not "aborted"
 
 
 # ── cross-project isolation (_claude_argv project_scoped) ─────────────────────
@@ -596,6 +731,7 @@ class TestProjectScopedIsolation:
 
         with (
             patch("beat.housekeeping_needed", return_value=True),
+            patch("beat._git", side_effect=_git_runner(commit_count=0)),
             patch("beat.run_skill", side_effect=fake_run_skill),
         ):
             beat._raid(beat.ProjectConfig(path=tmp_project))

@@ -1,11 +1,12 @@
 %erg v1
 Title: Beat housekeeping fixes go to a dedicated branch + distinct PR, verified+merged before continuation
-Status: open
+Status: closed
 Created: 2026-05-02
 Author: user
 
 --- log ---
 2026-05-02T07:08Z user created
+2026-05-02T07:30Z claude implemented — beat.py _housekeeping_phase + guard-no-push exception + 8 new tests
 
 --- body ---
 ## Context
