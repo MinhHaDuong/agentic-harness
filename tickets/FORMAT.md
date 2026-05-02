@@ -197,9 +197,9 @@ Housekeeping sweeps expired entries on each run.
 
 A ticket is **ready** (pickable) when:
 - `Status: open`
-- No local or remote branch name contains the ticket ID
-- Every `Blocked-by` local ref points to a `Status: closed` ticket
-- Not in the beat-config skip list with a future `until` timestamp
+- No local or remote branch name contains the ticket ID (enforced by `erg ready`)
+- Every `Blocked-by` local ref points to a `Status: closed` ticket (enforced by `erg ready`)
+- Not in the beat-config skip list with a future `until` timestamp (enforced by pick-ticket skill, not the binary)
 
 ## Archive criteria
 

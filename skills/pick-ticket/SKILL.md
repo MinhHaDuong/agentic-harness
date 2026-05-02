@@ -38,10 +38,12 @@ Select one ticket for the current sweep run.
    Exclude tickets whose scope won't fit the beat window (~50 min):
    write a beat-skip entry `{ "id": "...", "until": "{now+24h}", "reason": "scope-too-large: ..." }`
 
-   Exclude tickets whose log shows a `FAILED` or `BLOCKED` attempt within 24 h:
+   Exclude tickets whose body contains a `## Attempt log` section with a
+   `FAILED` or `BLOCKED` entry dated within the last 24 h (read the body,
+   find the most recent failure timestamp):
    write a beat-skip entry `{ "id": "...", "until": "{failed-ts+24h}", "reason": "cooldown-24h" }`
 
-   If a ticket has been attempted 3 or more times without success:
+   If the `## Attempt log` section has 3 or more entries regardless of outcome:
    write a beat-skip entry `{ "id": "...", "reason": "three-strikes: needs human review" }` (no `until`)
 
 4. **Rank remaining candidates:**
@@ -49,14 +51,14 @@ Select one ticket for the current sweep run.
    2. Then by lowest risk
    3. If risk is equal, prefer the simpler one
 
-5. **Write beat-skip updates.** If any exclusions were computed in step 3,
-   write them to `.git/beat-skip.json` now (merge with existing entries,
-   replacing any entry with the same `id`). No ticket files are modified.
-   No commit needed — beat-skip is machine-local state.
+5. **Write beat-skip updates.** Merge all new skip entries (from step 3) plus
+   a cooldown entry for the picked ticket into `.git/beat-skip.json`,
+   replacing any existing entry with the same `id`. No ticket files are
+   modified. No commit needed — beat-skip is machine-local state.
 
-   For the picked ticket, if it was recently picked (log has a pick within 8 h
-   and ticket is still open), add a cooldown entry:
-   `{ "id": "...", "until": "{pick-ts+8h}", "reason": "cooldown-recent-pick" }`
+   Always add a cooldown entry for the picked ticket (prevents re-picking on
+   the next beat before the raid has a chance to close it):
+   `{ "id": "...", "until": "{now+8h}", "reason": "cooldown-recent-pick" }`
 
 6. If the candidate set is empty after all exclusions, output
    `IDLE: no eligible tickets` and stop.
