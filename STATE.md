@@ -1,6 +1,6 @@
 # Imperial Dragon Harness — State
 
-Last updated: 2026-05-02T22:35Z
+Last updated: 2026-05-02T23:00Z
 
 ## North star
 
@@ -61,13 +61,8 @@ None
 
 ## Next actions
 
-- Merge git-erg PR #4 (ticket 0009 CI) — approved, scope clean
-- Review git-erg PR #5 (ticket 0011 erg update) — scope-flagged files need human review before merge
-- Merge aedist PR #300 (ticket 0129 slides restructure) — verified APPROVED
-- Check aedist PR #301 vs PR #302 (both ticket 0137) — close the older duplicate, merge the latest
-- Retry aedist ticket 0136 (Qwen 3.5 35B) — aborted due to Ollama timeout, not a logic failure
-- Fix chemin-de-voix budget: tickets 0019/0021/0022 hitting $10 cap every run (~$40 wasted overnight)
 - **doudou setup**: add source line to `~/.bashrc`, install nightbeat systemd units, copy erg binary to all projects
+- **Rate limit watch**: 7-day utilization at 86% as of 2026-05-02; resets 2026-05-04 21:00 CEST — monitor for stalled beat runs this weekend
 
 ## Backlog
 
