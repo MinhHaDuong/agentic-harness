@@ -1,11 +1,12 @@
 %erg v1
 Title: Audit disable-model-invocation setting in ticket-* skills
-Status: open
+Status: closed
 Created: 2026-05-02
 Author: claude
 
 --- log ---
 2026-05-02T23:10Z claude created
+2026-05-03T16:00Z claude status closed — audit-complete
 
 --- body ---
 ## Context

@@ -1,6 +1,9 @@
 ---
 name: ticket-new
 description: Create a local %erg v1 file for agent coordination.
+# Model-invocable: parses free-form input (title, sentence, gh JSON, paste) into %erg v1.
+# Side effects are file-only — no branch, no PR — so autonomous capture is safe.
+# Contrast start-ticket (disable-model-invocation: true), which creates worktree + branch + PR.
 disable-model-invocation: false
 user-invocable: true
 argument-hint: [title]
