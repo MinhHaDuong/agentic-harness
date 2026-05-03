@@ -8,7 +8,7 @@
 //	erg archive  [dir] [--days N] [--execute]
 //	erg graph    [dir] [--json]
 //	erg next-id  [dir]
-//	erg close    <id> [reason]
+//	erg close    [--dir <path>] <id> [reason]
 package main
 
 import (
@@ -1125,87 +1125,56 @@ func closeTicket(dir, id, reason string) (int, string) {
 	if err != nil {
 		return 1, fmt.Sprintf("erg close: read %s: %v", path, err)
 	}
-
 	content := string(data)
 
-	// Locate the log and body separators. Operate only on the headers slice
-	// when rewriting Status, and insert the new log line just before
-	// `--- body ---`, immediately after the last non-empty log line.
-	logSep := "--- log ---"
-	bodySep := "--- body ---"
-	logIdx := strings.Index(content, "\n"+logSep+"\n")
+	// Valid %erg v1 files always have `\n--- log ---\n` and `\n--- body ---\n`
+	// (magic line is first). Anything else is malformed; let the validator
+	// catch it elsewhere — here we just refuse to mutate.
+	const logSep = "\n--- log ---\n"
+	const bodySep = "\n--- body ---\n"
+	logIdx := strings.Index(content, logSep)
 	if logIdx < 0 {
-		// allow leading/no preceding newline — fall back to substring search
-		logIdx = strings.Index(content, logSep)
-		if logIdx < 0 {
-			return 1, fmt.Sprintf("erg close: %s missing %q separator", path, logSep)
-		}
-	} else {
-		logIdx++ // skip the leading newline so logIdx points at logSep
+		return 1, fmt.Sprintf("erg close: %s missing %q separator", path, "--- log ---")
 	}
-	bodyIdx := strings.Index(content, "\n"+bodySep+"\n")
+	bodyIdx := strings.Index(content, bodySep)
 	if bodyIdx < 0 {
-		bodyIdx = strings.Index(content, bodySep)
-		if bodyIdx < 0 {
-			return 1, fmt.Sprintf("erg close: %s missing %q separator", path, bodySep)
-		}
-	} else {
-		bodyIdx++
+		return 1, fmt.Sprintf("erg close: %s missing %q separator", path, "--- body ---")
 	}
-
-	// Idempotency: re-parse the file to check current Status.
-	t := parseErg(path)
-	if t.Status() == "closed" {
-		return 0, fmt.Sprintf("ticket %s already closed", id)
-	}
+	logIdx++   // point at the separator line itself, not the preceding newline
+	bodyIdx++  // same
 
 	headersSlice := content[:logIdx]
 	logSlice := content[logIdx:bodyIdx]
 	bodySlice := content[bodyIdx:]
 
-	// Rewrite first `Status: open` line in headers slice.
-	statusRE := regexp.MustCompile(`(?m)^Status: open$`)
-	loc := statusRE.FindStringIndex(headersSlice)
+	// Idempotency: check the headers slice for `Status: closed` directly.
+	if statusClosedRE.MatchString(headersSlice) {
+		return 0, fmt.Sprintf("ticket %s already closed", id)
+	}
+
+	loc := statusOpenRE.FindStringIndex(headersSlice)
 	if loc == nil {
 		return 1, fmt.Sprintf("erg close: %s has no `Status: open` header line", path)
 	}
 	newHeaders := headersSlice[:loc[0]] + "Status: closed" + headersSlice[loc[1]:]
 
-	// Build the new log line and insert into logSlice.
 	ts := time.Now().UTC().Format("2006-01-02T15:04Z")
 	newLogLine := fmt.Sprintf("%s claude status closed — %s", ts, reason)
 
-	// Find the last non-empty log line and insert immediately after it.
-	// logSlice currently looks like: "--- log ---\n<entries...>\n" up to the
-	// position of `--- body ---`.
-	// We split on "\n", find the last index of a non-empty trimmed line,
-	// then re-join with the new line inserted right after it.
+	// Insert newLogLine immediately after the last non-empty log line, so it
+	// appears just before any trailing blank line / `--- body ---`.
 	logLines := strings.Split(logSlice, "\n")
-	lastNonEmpty := -1
+	insertAfter := 0 // default: just after the `--- log ---` line itself (index 0)
 	for i, ln := range logLines {
-		if strings.TrimSpace(ln) == "" {
+		if i == 0 || strings.TrimSpace(ln) == "" {
 			continue
 		}
-		if ln == logSep {
-			continue
-		}
-		lastNonEmpty = i
+		insertAfter = i
 	}
-	if lastNonEmpty < 0 {
-		// No existing log entries — insert directly after the separator.
-		// Find the separator index in the slice.
-		for i, ln := range logLines {
-			if ln == logSep {
-				lastNonEmpty = i
-				break
-			}
-		}
-	}
-	// Insert newLogLine after lastNonEmpty.
 	out := make([]string, 0, len(logLines)+1)
-	out = append(out, logLines[:lastNonEmpty+1]...)
+	out = append(out, logLines[:insertAfter+1]...)
 	out = append(out, newLogLine)
-	out = append(out, logLines[lastNonEmpty+1:]...)
+	out = append(out, logLines[insertAfter+1:]...)
 	newLogSlice := strings.Join(out, "\n")
 
 	newContent := newHeaders + newLogSlice + bodySlice
@@ -1216,23 +1185,41 @@ func closeTicket(dir, id, reason string) (int, string) {
 	return 0, fmt.Sprintf("closed %s: %s", id, reason)
 }
 
+var (
+	statusOpenRE   = regexp.MustCompile(`(?m)^Status: open$`)
+	statusClosedRE = regexp.MustCompile(`(?m)^Status: closed$`)
+)
+
 // cmdClose parses CLI args and calls closeTicket. Args layout:
 //
-//	[<id>] [<reason-words...>]
+//	[--dir <path>] <id> [reason-words...]
 //
 // If multiple words follow <id>, they are joined with single spaces to form
-// the reason. Default reason: "done".
+// the reason. Default reason: "done". Default dir: "tickets".
 func cmdClose(args []string) int {
-	if len(args) == 0 {
-		fmt.Fprintln(os.Stderr, "erg close: usage: erg close <id> [reason]")
+	dir := "tickets"
+	var positional []string
+	for i := 0; i < len(args); i++ {
+		switch {
+		case args[i] == "--dir" && i+1 < len(args):
+			dir = args[i+1]
+			i++
+		case strings.HasPrefix(args[i], "--dir="):
+			dir = args[i][len("--dir="):]
+		default:
+			positional = append(positional, args[i])
+		}
+	}
+	if len(positional) == 0 {
+		fmt.Fprintln(os.Stderr, "erg close: usage: erg close [--dir <path>] <id> [reason]")
 		return 1
 	}
-	id := args[0]
+	id := positional[0]
 	reason := defaultCloseReason
-	if len(args) > 1 {
-		reason = strings.Join(args[1:], " ")
+	if len(positional) > 1 {
+		reason = strings.Join(positional[1:], " ")
 	}
-	exit, msg := closeTicket("tickets", id, reason)
+	exit, msg := closeTicket(dir, id, reason)
 	if exit == 0 {
 		fmt.Println(msg)
 	} else {
@@ -1277,7 +1264,7 @@ func printUsage() {
 	fmt.Fprintln(os.Stderr, "  archive [dir] [--days N] [--execute]  Archive old closed tickets")
 	fmt.Fprintln(os.Stderr, "  graph [dir] [--json]                Show ticket dependency DAG")
 	fmt.Fprintln(os.Stderr, "  next-id [dir]                       Print the next available ticket ID")
-	fmt.Fprintln(os.Stderr, "  close <id> [reason]                 Mark a ticket closed with a status log line")
+	fmt.Fprintln(os.Stderr, "  close [--dir <path>] <id> [reason]  Mark a ticket closed with a status log line")
 }
 
 func main() {
