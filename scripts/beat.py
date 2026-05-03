@@ -21,7 +21,7 @@ import sys
 import threading
 import time
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from io import TextIOBase
 from pathlib import Path
 
@@ -803,6 +803,31 @@ def _housekeeping_phase(project: ProjectConfig) -> str:
     return "merged"
 
 
+def _ticket_recently_picked(ticket_path: Path, within_hours: int = 8) -> bool:
+    """True if a sweep-pick log line in this ticket is within cutoff.
+
+    Implements the cooldown-recent-pick guard previously enforced by prose
+    in skills/pick-ticket/SKILL.md (ticket 0051 Layer 0). A ticket whose
+    log shows it was picked within ``within_hours`` should not be re-picked
+    until the prior raid has had a chance to close it.
+    """
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=within_hours)
+    try:
+        text = ticket_path.read_text()
+    except (FileNotFoundError, OSError):
+        return False
+    for line in text.splitlines():
+        if "sweep-pick: selected" in line or "sweep-pick: picked" in line:
+            try:
+                ts_str = line.split()[0].rstrip("Z")
+                ts = datetime.fromisoformat(ts_str).replace(tzinfo=timezone.utc)
+                if ts > cutoff:
+                    return True
+            except (ValueError, IndexError):
+                continue
+    return False
+
+
 def _raid(project: ProjectConfig) -> tuple[str, str | None]:
     """Run the pick→raid sequence; return (outcome, ticket_id)."""
     ticket_id: str | None = None
@@ -817,6 +842,16 @@ def _raid(project: ProjectConfig) -> tuple[str, str | None]:
     hk_outcome = _housekeeping_phase(project)
     if hk_outcome in ("failed", "timeout", "ci-failed"):
         return "aborted", None
+
+    # Cooldown-recent-pick guard (ticket 0051 Layer 0). If any open ticket
+    # was picked within the last 8h, skip pick-ticket entirely — the prior
+    # raid hasn't had a chance to close it yet, and re-picking risks a
+    # double-raid.
+    if any(
+        _ticket_recently_picked(t) for t in path.glob("tickets/*.erg")
+    ):
+        _log("=== pick-ticket: skipped (cooldown-recent-pick) ===")
+        return "idle", None
 
     # Pick ticket. Loop on CLOSED (Tier 2 of ticket 0049): pick-ticket may
     # detect that a candidate's exit criteria are already met, close it, and

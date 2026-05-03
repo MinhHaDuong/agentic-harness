@@ -5,6 +5,7 @@ import subprocess
 import sys
 import textwrap
 import time
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -1311,3 +1312,104 @@ class TestRaidDoneButOpenWarning:
             beat._raid(beat.ProjectConfig(path=tmp_project))
 
         assert not any("warning" in l and "not closed" in l for l in log_lines)
+
+
+# ── Cooldown-recent-pick guard (ticket 0051 Layer 0) ──────────────────────────
+
+
+class TestTicketRecentlyPicked:
+    def test_fires_within_8h(self, tmp_path):
+        ticket = tmp_path / "0001-test.erg"
+        now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%MZ")
+        ticket.write_text(
+            f"%erg v1\nTitle: T\nStatus: open\n\n--- log ---\n"
+            f"{now_iso} claude note sweep-pick: picked\n\n--- body ---\n"
+        )
+        assert beat._ticket_recently_picked(ticket, within_hours=8) is True
+
+    def test_clears_after_8h(self, tmp_path):
+        ticket = tmp_path / "0002-test.erg"
+        old = (datetime.now(timezone.utc) - timedelta(hours=9)).strftime(
+            "%Y-%m-%dT%H:%MZ"
+        )
+        ticket.write_text(
+            f"%erg v1\nTitle: T\nStatus: open\n\n--- log ---\n"
+            f"{old} claude note sweep-pick: picked\n\n--- body ---\n"
+        )
+        assert beat._ticket_recently_picked(ticket, within_hours=8) is False
+
+    def test_ignores_malformed_line(self, tmp_path):
+        ticket = tmp_path / "0003-test.erg"
+        ticket.write_text(
+            "%erg v1\nTitle: T\nStatus: open\n\n--- log ---\n"
+            "not-a-timestamp claude note sweep-pick: picked\n\n--- body ---\n"
+        )
+        assert beat._ticket_recently_picked(ticket, within_hours=8) is False
+
+
+class TestRaidCooldownRecentPick:
+    """Layer 0: when a ticket has a recent sweep-pick log entry, _raid()
+    short-circuits to idle before invoking pick-ticket."""
+
+    def setup_method(self):
+        beat.DRY_RUN = False
+
+    def test_skips_pick_ticket_when_recent_pick_exists(self, tmp_project):
+        (tmp_project / "tickets").mkdir(exist_ok=True)
+        now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%MZ")
+        (tmp_project / "tickets" / "0042-recent.erg").write_text(
+            f"%erg v1\nTitle: recent\nStatus: open\n\n--- log ---\n"
+            f"{now_iso} claude note sweep-pick: picked\n\n--- body ---\n"
+        )
+
+        calls: list[str] = []
+
+        def fake_run_skill(skill, **kwargs):
+            calls.append(skill)
+            return (0, "")
+
+        log_lines: list[str] = []
+        with (
+            patch("beat.housekeeping_needed", return_value=False),
+            patch("beat._repo_active", return_value=False),
+            patch("beat.run_skill", side_effect=fake_run_skill),
+            patch("beat._log", side_effect=log_lines.append),
+        ):
+            outcome, ticket = beat._raid(beat.ProjectConfig(path=tmp_project))
+
+        assert outcome == "idle"
+        assert ticket is None
+        assert not any("pick-ticket" in c for c in calls), (
+            "pick-ticket must not be invoked when a recent-pick cooldown applies"
+        )
+        assert any("cooldown-recent-pick" in l for l in log_lines)
+
+    def test_proceeds_when_no_recent_pick(self, tmp_project):
+        (tmp_project / "tickets").mkdir(exist_ok=True)
+        old = (datetime.now(timezone.utc) - timedelta(hours=9)).strftime(
+            "%Y-%m-%dT%H:%MZ"
+        )
+        (tmp_project / "tickets" / "0043-old.erg").write_text(
+            f"%erg v1\nTitle: old\nStatus: open\n\n--- log ---\n"
+            f"{old} claude note sweep-pick: picked\n\n--- body ---\n"
+        )
+
+        calls: list[str] = []
+
+        def fake_run_skill(skill, **kwargs):
+            calls.append(skill)
+            if "pick-ticket" in skill:
+                return (0, "IDLE: empty queue")
+            return (0, "")
+
+        with (
+            patch("beat.housekeeping_needed", return_value=False),
+            patch("beat._repo_active", return_value=False),
+            patch("beat.run_skill", side_effect=fake_run_skill),
+        ):
+            outcome, _ = beat._raid(beat.ProjectConfig(path=tmp_project))
+
+        assert outcome == "idle"
+        assert any("pick-ticket" in c for c in calls), (
+            "pick-ticket should be invoked when no recent-pick cooldown applies"
+        )
