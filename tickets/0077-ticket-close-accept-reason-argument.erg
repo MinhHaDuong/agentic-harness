@@ -1,0 +1,89 @@
+%erg v1
+Title: ticket-close should accept an optional reason argument
+Status: closed
+Created: 2026-05-03
+Author: claude
+
+--- log ---
+2026-05-03T15:00Z claude created
+2026-05-03T16:00Z claude status closed — already-done: superseded by PR #85 (commit aa7e40e), which mechanized /ticket-close to delegate to `erg close <id> <reason>`. The reason-argument feature this ticket asked for is already on main; argument-hint reads `<ticket-id> [reason]`. PR #85 also addressed the broader 0057 vision (route mutations through erg binary) for the close path.
+
+--- body ---
+## Context
+
+The `/ticket-close` skill currently takes only `<ticket-id>` (per its
+frontmatter `argument-hint: <ticket-id>`). The body of the skill at
+step 2 says "Append log line: `{timestamp} {agent} status closed — {reason}`",
+but there is no mechanism for the caller to *supply* the reason — it
+ends up baked into whatever the closing agent decides to write at that
+moment.
+
+This came up during the 2026-05-03 mecanisation raid (PR #89, Tier 2 of
+ticket 0049). Pick-ticket needs to close a ticket whose exit criteria
+are already met and explicitly signal the reason as `already-done` so
+that downstream tooling (audit scripts, future Tier 1 housekeeping)
+can grep `sweep-close: already-done` to distinguish self-closures from
+human-driven closures. Because `/ticket-close <id>` cannot accept a
+reason, pick-ticket now writes its own
+`{ts} claude note sweep-close: already-done hash:<bodyhash>` log line
+*after* calling `/ticket-close`, which is a layering wart: pick-ticket
+and ticket-close together know how to "close with reason" but the
+structured-reason bit lives only in pick-ticket prose.
+
+## Goal
+
+Allow `/ticket-close <id> <reason>` to set the structured reason in the
+status log line directly, so pick-ticket (and any future caller) can
+delegate the full close+annotate operation in one call.
+
+## Actions
+
+1. Update `skills/ticket-close/SKILL.md`:
+   - Frontmatter: `argument-hint: <ticket-id> [reason]`
+   - Step 1: parse `$ARGUMENTS` into ticket-id (first whitespace-separated
+     token) and optional reason (rest of the string).
+   - Step 2: append `{timestamp} {agent} status closed — {reason}`
+     where `{reason}` is the parsed reason if non-empty, else a default
+     like `closed by /ticket-close`.
+
+2. Update `skills/pick-ticket/SKILL.md` step 4 (the lightweight
+   exit-criteria check added in PR #89): replace the two-step
+   `/ticket-close <id>` + manual `sweep-close: already-done` log line
+   with a single `/ticket-close <id> already-done`. The log line then
+   reads `{ts} claude status closed — already-done`, which serves the
+   same audit purpose as the current `sweep-close: already-done` line.
+
+3. Update any tests that grep for `sweep-close: already-done` to grep
+   for `status closed — already-done` instead, OR keep the
+   `sweep-close:` convention and have ticket-close emit BOTH a `status`
+   line and a `sweep-close:` line when called with `already-done`.
+   Decide which convention to keep before implementing.
+
+## Test
+
+Add a small bash test under `tests/`:
+- `tests/test_ticket_close_reason.sh`
+- Create a temp `.erg` ticket file in a fixture dir.
+- Invoke whatever wraps `/ticket-close` non-interactively (a small shell
+  helper, or a direct file-mutation function if `/ticket-close` itself
+  is LLM-only) with id + reason.
+- Assert the resulting log line matches the expected pattern and that
+  the body hash is present if the caller is `pick-ticket`.
+
+## Exit criteria
+
+- `/ticket-close <id> <reason>` writes a status log line that includes
+  the reason in a grep-stable form.
+- `/ticket-close <id>` (no reason) still works and writes a default
+  reason.
+- PR #89's pick-ticket step 4 prose can be simplified to call
+  `/ticket-close <id> already-done` and remove its hand-written log
+  line.
+- Existing audit / tooling that greps for `already-done` continues to
+  match.
+
+## Notes
+
+This is small (probably <30 lines of skill prose). Spawned out of the
+mecanisation raid Phase 6/7 review — see
+`docs/2026-05-03-raid-mecanisation-phase6-7.md` §4.
