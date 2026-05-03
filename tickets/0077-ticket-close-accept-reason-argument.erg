@@ -1,11 +1,12 @@
 %erg v1
 Title: ticket-close should accept an optional reason argument
-Status: open
+Status: closed
 Created: 2026-05-03
 Author: claude
 
 --- log ---
 2026-05-03T15:00Z claude created
+2026-05-03T16:00Z claude status closed — already-done: superseded by PR #85 (commit aa7e40e), which mechanized /ticket-close to delegate to `erg close <id> <reason>`. The reason-argument feature this ticket asked for is already on main; argument-hint reads `<ticket-id> [reason]`. PR #85 also addressed the broader 0057 vision (route mutations through erg binary) for the close path.
 
 --- body ---
 ## Context
