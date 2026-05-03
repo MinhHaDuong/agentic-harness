@@ -1,6 +1,6 @@
 %erg v1
 Title: Replace harness-rules skill with index-based lazy load
-Status: open
+Status: closed
 Created: 2026-04-28
 Author: claude
 
@@ -11,6 +11,7 @@ Author: claude
 2026-04-29T09:25Z claude note sweep-skip: scope-too-large hash:edaeb529c775 expires:2026-04-30T09:21Z
 2026-04-29T18:55Z claude note repaired body corruption from erg sweep-skip bug (ticket 0060)
 2026-05-03T09:00Z haduong note design refined: session start loads only a rules index (harness-rules/README.md); agents read rule files on demand; verify-adherence (ticket 0021) is the mechanical ex-post check. Portability goal: plain markdown, not Claude Code-specific mechanisms like .claude/rules/ globs.
+2026-05-03T12:50Z claude status closed — index README written, on-start.sh emits it before stdout cutoff, SKILL.md removed, README/STATE updated, tests/test_harness_rules_injection.sh green
 --- body ---
 ## Context
 

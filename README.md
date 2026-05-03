@@ -19,8 +19,8 @@ Every task passes through five phases:
 ```
 ImperialDragonHarness/
 ├── skills/                 # Slash commands — 24 total: /beat, /celebrate, /verify, /raid, etc.
-│   ├── harness-rules/      # Auto-invoked rules (companion .md files)
-│   │   ├── SKILL.md
+│   ├── harness-rules/      # Rule index (README.md) injected at SessionStart; bodies read on demand
+│   │   ├── README.md           # One-screen index: filename, scope, summary
 │   │   ├── workflow.md         # Session start, escalation, worktree
 │   │   ├── git.md              # Branch, commit, PR discipline
 │   │   ├── coding-python.md    # Python style, testing, Make (load when Python project)
