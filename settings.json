@@ -1,6 +1,7 @@
 {
   "env": {
-    "UV_ENV_FILE": "/home/haduong/.claude/.env"
+    "UV_ENV_FILE": "/home/haduong/.claude/.env",
+    "BASH_ENV": "/home/haduong/.claude/scripts/bash-env.sh"
   },
   "permissions": {
     "allow": [
