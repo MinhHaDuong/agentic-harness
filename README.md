@@ -1,5 +1,9 @@
 # Imperial Dragon Harness
 
+Casual people get shit done. Real humans ride the Imperial Dragon Harness.
+They `/raid` tickets to bring back PR, they `/beat` their wings autonomously,
+they `/perch` to orient midchat.
+
 A Claude Code harness for Minh Ha-Duong's research workflow. Lives as `~/.claude`.
 
 ## The Five Claws
@@ -18,7 +22,7 @@ Every task passes through five phases:
 
 ```
 ImperialDragonHarness/
-├── skills/                 # Slash commands — 24 total: /beat, /celebrate, /verify, /raid, etc.
+├── skills/                 # Slash commands — 25 total: /beat, /celebrate, /verify, /raid, /perch, etc.
 │   ├── harness-rules/      # Rule index (README.md) injected at SessionStart; bodies read on demand
 │   │   ├── README.md           # One-screen index: filename, scope, summary
 │   │   ├── workflow.md         # Session start, escalation, worktree
@@ -48,6 +52,7 @@ ImperialDragonHarness/
 │   ├── housekeeping/       # Repo hygiene: git sync, healthcheck, stale-branch cleanup
 │   ├── nightbeat-report/   # Morning review of autonomous nightbeat runs
 │   ├── pick-ticket/        # Pick lowest-risk ready ticket for autonomous sweep
+│   ├── perch/              # Mid-chat orientation
 │   └── smoke/              # Agent environment smoke test
 ├── scripts/                # Hook implementations + shell init
 │   ├── shell-init.sh           # Source from ~/.bashrc — claude wrapper
@@ -58,8 +63,7 @@ ImperialDragonHarness/
 │   ├── lint-on-edit.sh
 │   └── warn-stale-rules.sh
 ├── commands/               # Guidance documents
-│   ├── choose-journal.md
-│   └── gsd/                    # 33 research workflow commands
+│   └── choose-journal.md
 ├── bin/                    # Utilities (added to PATH)
 │   ├── usage-report
 │   ├── snapshot
