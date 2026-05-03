@@ -1,0 +1,40 @@
+%erg v1
+Title: Stop leaking API keys in ps -ef via CLAUDE_ENV_FILE
+Status: open
+Created: 2026-05-03
+Author: claude
+
+--- log ---
+2026-05-03T10:00Z claude created
+2026-05-03T10:00Z claude linked gh#83
+
+--- body ---
+## Problem
+
+`on-start.sh` wrote `KEY=VALUE` pairs to `CLAUDE_ENV_FILE`. Claude Code inlines those as
+shell variable assignments before every Bash tool call:
+
+    /bin/bash -c "source snapshot.sh && KEY=val eval 'command'"
+
+The secrets end up in argv, which is world-readable via `ps -ef`. Multiple orphaned bash
+processes (PIDs 1258886, 1806318, 2246411, 2329898, 2330495) were discovered with all API
+keys exposed since 2026-04-30 — ~3 days.
+
+## Fix (implemented in gh#83)
+
+Switch to `BASH_ENV`: bash sources the file before each non-interactive invocation,
+exporting secrets into the process environment block (not argv). Environment blocks
+are only readable by the process owner and root.
+
+Changes:
+- `scripts/bash-env.sh` — new script: `set -a`, sources `~/.claude/.env` and `$PWD/.env`, `set +a`
+- `settings.json` — added `"BASH_ENV": ".../bash-env.sh"` to `env` section
+- `scripts/on-start.sh` — removed `persist_env` function and all calls
+
+Also swept 689 stale `session-env/*/sessionstart-hook-*.sh` files containing plaintext secrets.
+
+## Exit criteria
+
+- [ ] PR #83 merged
+- [ ] CI green (pipefail-guard excludes `bash-env.sh` — same rationale as `shell-init.sh`)
+- [ ] Fresh session: `ps -ef | grep -E 'sk-ant|HAL_PASSWORD'` returns empty
