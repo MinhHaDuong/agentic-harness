@@ -8,6 +8,7 @@
 //	erg archive  [dir] [--days N] [--execute]
 //	erg graph    [dir] [--json]
 //	erg next-id  [dir]
+//	erg close    [--dir <path>] <id> [reason]
 package main
 
 import (
@@ -1081,6 +1082,153 @@ func cmdNextID(args []string) int {
 }
 
 // ---------------------------------------------------------------------------
+// Close — mark a ticket closed and append a status log line
+// ---------------------------------------------------------------------------
+
+const defaultCloseReason = "done"
+
+// closeTicket marks the ticket with the given id (4-digit prefix) as closed
+// and appends a `{ts} claude status closed — {reason}` log line.
+//
+// Behavior:
+//   - If no ticket file matches `<dir>/<id>-*.erg`, returns (1, error message).
+//   - If multiple files match, returns (1, error message).
+//   - If the ticket is already `Status: closed`, no file mutation happens
+//     and (0, "ticket <id> already closed") is returned.
+//   - Otherwise, replaces the first `Status: open` line in the headers
+//     section (everything before `--- log ---`) with `Status: closed` and
+//     appends the status log line immediately after the last non-empty log
+//     line, returning (0, "closed <id>: <reason>").
+func closeTicket(dir, id, reason string) (int, string) {
+	if reason == "" {
+		reason = defaultCloseReason
+	}
+
+	pattern := filepath.Join(dir, id+"-*.erg")
+	matches, err := filepath.Glob(pattern)
+	if err != nil {
+		return 1, fmt.Sprintf("erg close: glob error: %v", err)
+	}
+	if len(matches) == 0 {
+		return 1, fmt.Sprintf("erg close: no ticket found for id %s in %s", id, dir)
+	}
+	if len(matches) > 1 {
+		return 1, fmt.Sprintf("erg close: multiple tickets matched id %s: %s", id, strings.Join(matches, ", "))
+	}
+
+	path := matches[0]
+	info, err := os.Stat(path)
+	if err != nil {
+		return 1, fmt.Sprintf("erg close: stat %s: %v", path, err)
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return 1, fmt.Sprintf("erg close: read %s: %v", path, err)
+	}
+	content := string(data)
+
+	// Valid %erg v1 files always have `\n--- log ---\n` and `\n--- body ---\n`
+	// (magic line is first). Anything else is malformed; let the validator
+	// catch it elsewhere — here we just refuse to mutate.
+	const logSep = "\n--- log ---\n"
+	const bodySep = "\n--- body ---\n"
+	logIdx := strings.Index(content, logSep)
+	if logIdx < 0 {
+		return 1, fmt.Sprintf("erg close: %s missing %q separator", path, "--- log ---")
+	}
+	bodyIdx := strings.Index(content, bodySep)
+	if bodyIdx < 0 {
+		return 1, fmt.Sprintf("erg close: %s missing %q separator", path, "--- body ---")
+	}
+	logIdx++   // point at the separator line itself, not the preceding newline
+	bodyIdx++  // same
+
+	headersSlice := content[:logIdx]
+	logSlice := content[logIdx:bodyIdx]
+	bodySlice := content[bodyIdx:]
+
+	// Idempotency: check the headers slice for `Status: closed` directly.
+	if statusClosedRE.MatchString(headersSlice) {
+		return 0, fmt.Sprintf("ticket %s already closed", id)
+	}
+
+	loc := statusOpenRE.FindStringIndex(headersSlice)
+	if loc == nil {
+		return 1, fmt.Sprintf("erg close: %s has no `Status: open` header line", path)
+	}
+	newHeaders := headersSlice[:loc[0]] + "Status: closed" + headersSlice[loc[1]:]
+
+	ts := time.Now().UTC().Format("2006-01-02T15:04Z")
+	newLogLine := fmt.Sprintf("%s claude status closed — %s", ts, reason)
+
+	// Insert newLogLine immediately after the last non-empty log line, so it
+	// appears just before any trailing blank line / `--- body ---`.
+	logLines := strings.Split(logSlice, "\n")
+	insertAfter := 0 // default: just after the `--- log ---` line itself (index 0)
+	for i, ln := range logLines {
+		if i == 0 || strings.TrimSpace(ln) == "" {
+			continue
+		}
+		insertAfter = i
+	}
+	out := make([]string, 0, len(logLines)+1)
+	out = append(out, logLines[:insertAfter+1]...)
+	out = append(out, newLogLine)
+	out = append(out, logLines[insertAfter+1:]...)
+	newLogSlice := strings.Join(out, "\n")
+
+	newContent := newHeaders + newLogSlice + bodySlice
+
+	if err := os.WriteFile(path, []byte(newContent), info.Mode().Perm()); err != nil {
+		return 1, fmt.Sprintf("erg close: write %s: %v", path, err)
+	}
+	return 0, fmt.Sprintf("closed %s: %s", id, reason)
+}
+
+var (
+	statusOpenRE   = regexp.MustCompile(`(?m)^Status: open$`)
+	statusClosedRE = regexp.MustCompile(`(?m)^Status: closed$`)
+)
+
+// cmdClose parses CLI args and calls closeTicket. Args layout:
+//
+//	[--dir <path>] <id> [reason-words...]
+//
+// If multiple words follow <id>, they are joined with single spaces to form
+// the reason. Default reason: "done". Default dir: "tickets".
+func cmdClose(args []string) int {
+	dir := "tickets"
+	var positional []string
+	for i := 0; i < len(args); i++ {
+		switch {
+		case args[i] == "--dir" && i+1 < len(args):
+			dir = args[i+1]
+			i++
+		case strings.HasPrefix(args[i], "--dir="):
+			dir = args[i][len("--dir="):]
+		default:
+			positional = append(positional, args[i])
+		}
+	}
+	if len(positional) == 0 {
+		fmt.Fprintln(os.Stderr, "erg close: usage: erg close [--dir <path>] <id> [reason]")
+		return 1
+	}
+	id := positional[0]
+	reason := defaultCloseReason
+	if len(positional) > 1 {
+		reason = strings.Join(positional[1:], " ")
+	}
+	exit, msg := closeTicket(dir, id, reason)
+	if exit == 0 {
+		fmt.Println(msg)
+	} else {
+		fmt.Fprintln(os.Stderr, msg)
+	}
+	return exit
+}
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
@@ -1116,6 +1264,7 @@ func printUsage() {
 	fmt.Fprintln(os.Stderr, "  archive [dir] [--days N] [--execute]  Archive old closed tickets")
 	fmt.Fprintln(os.Stderr, "  graph [dir] [--json]                Show ticket dependency DAG")
 	fmt.Fprintln(os.Stderr, "  next-id [dir]                       Print the next available ticket ID")
+	fmt.Fprintln(os.Stderr, "  close [--dir <path>] <id> [reason]  Mark a ticket closed with a status log line")
 }
 
 func main() {
@@ -1139,6 +1288,8 @@ func main() {
 		exitCode = cmdGraph(rest)
 	case "next-id":
 		exitCode = cmdNextID(rest)
+	case "close":
+		exitCode = cmdClose(rest)
 	case "-h", "--help", "help":
 		printUsage()
 		exitCode = 0
