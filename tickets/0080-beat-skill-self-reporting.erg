@@ -1,0 +1,27 @@
+%erg v1
+Title: Move beat run-summary into beat.py — eliminate JSONL parsing from skill
+Status: open
+Created: 2026-05-03
+Author: claude
+
+--- log ---
+2026-05-03T09:00Z claude created
+
+--- body ---
+## Context
+The beat skill calls beat.py, then reads the last line of beat-log.jsonl
+and formats a human-readable run report. beat.py already has all the data
+in memory when the run ends; printing its own summary removes the need for
+the skill to parse JSONL.
+
+## Actions
+1. Add a `_print_run_summary()` call at the end of the beat.py run loop,
+   printing: project, ticket_id, outcome, duration, cost.
+2. Redirect this output to stdout (not just the log file).
+3. Simplify the beat skill body: remove the JSONL-read and format steps.
+   The skill becomes: invoke beat.py, echo its stdout.
+
+## Exit criteria
+- beat.py prints a one-line summary on stdout at end of run
+- beat skill body contains no JSONL parsing
+- Output format matches what the nightbeat-report parser expects (or parser updated)

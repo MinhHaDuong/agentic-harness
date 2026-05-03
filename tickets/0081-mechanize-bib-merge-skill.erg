@@ -1,0 +1,29 @@
+%erg v1
+Title: Mechanize bib-merge skill — extract deduplication to Python script
+Status: open
+Created: 2026-05-03
+Author: claude
+
+--- log ---
+2026-05-03T09:00Z claude created
+
+--- body ---
+## Context
+The bib-merge skill does bibtex deduplication: parse fence, match by
+author+year+DOI/title, dedupe, rename keys on collision, append to refs.bib,
+report diffs. This is deterministic string manipulation. The LLM adds no
+reasoning value; it just runs an algorithm that Python handles better.
+
+## Actions
+1. Implement `~/.claude/scripts/bib-merge.py`:
+   - Reads a bibtex block from stdin (or file arg)
+   - Parses with `bibtexparser` (or hand-rolled; entries are simple)
+   - Deduplicates against existing `refs.bib` on author+year, confirmed by DOI or title
+   - Renames key on collision (bump suffix), appends new entries
+   - Prints a diff-style report of added/skipped/renamed entries
+2. Rewrite bib-merge skill: pipe input to `bib-merge.py`, report its output.
+
+## Exit criteria
+- `~/.claude/scripts/bib-merge.py` exists, tested on ≥2 entries including a duplicate
+- Skill body makes one Bash call to the script
+- No LLM string-manipulation steps remain in the skill body

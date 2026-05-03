@@ -1,0 +1,26 @@
+%erg v1
+Title: Mechanize smoke skill — extract shell steps to bash script
+Status: open
+Created: 2026-05-03
+Author: claude
+
+--- log ---
+2026-05-03T09:00Z claude created
+
+--- body ---
+## Context
+The smoke skill runs 7 shell commands (date, whoami, pwd, printenv, etc.)
+via Bash tool calls, then adds two hardcoded personality responses. Steps
+1-7 are pure data collection; they waste LLM tokens on tool calls that a
+bash script handles in milliseconds.
+
+## Actions
+1. Create `~/.claude/scripts/smoke.sh` that runs and prints items 1-7.
+2. Rewrite smoke skill body: call `smoke.sh` once, then ask the LLM only
+   for the two personality items (Truyện Kiều line, dog name).
+3. Update smoke frontmatter if needed.
+
+## Exit criteria
+- `~/.claude/scripts/smoke.sh` exists and is executable
+- Smoke skill makes exactly 1 Bash call (the script) + 0 additional tool calls for items 1-7
+- Personality items still answered by the LLM
