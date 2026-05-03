@@ -1,0 +1,120 @@
+%erg v1
+Title: Fix /ticket-close — add erg close subcommand and clean up pick-ticket
+Status: open
+Created: 2026-05-03
+Author: claude
+
+--- log ---
+2026-05-03T16:30Z claude created
+
+--- body ---
+## Context
+
+PR #85 (merged 2026-05-03, commit aa7e40e) rewrote `skills/ticket-close/SKILL.md`
+to delegate to `${ERG:-erg} close <id> <reason>`. The skill's
+frontmatter now reads `argument-hint: <ticket-id> [reason]` — the
+reason-argument capability that ticket 0077 originally proposed.
+
+But the `erg` Go binary in `tickets/tools/go/main.go` does **not**
+implement a `close` subcommand. The dispatch table at the bottom of
+`main.go` covers `validate / ready / archive / graph / next-id` only.
+Running `/ticket-close <id> done` on main today fails with
+`Unknown command: close` and the ticket file is not mutated — the
+`Status:` field stays `open`.
+
+This silently breaks the PR #89 CLOSED-loop path in pick-ticket:
+
+1. pick-ticket detects exit criteria are met for an open ticket
+2. pick-ticket invokes `/ticket-close <id>` (no reason) — fails silently;
+   ticket stays `open`
+3. pick-ticket appends a `sweep-close: already-done` log line manually
+4. Beat receives `CLOSED: <id>`, loops back, picks the next candidate
+5. Next beat: same ticket is still `open`, gets picked again, same
+   exit-criteria match, same flow — until `MAX_CLOSED_REPICKS=3` aborts
+
+The pick-ticket cleanup that 0077 also proposed (drop the hand-written
+`sweep-close:` line, call `/ticket-close <id> already-done` directly)
+is also still owed.
+
+## Goal
+
+Make `/ticket-close <id> [reason]` actually close tickets on main, and
+remove the layering wart in pick-ticket.
+
+## Two scope options
+
+**Option A — ship `erg close` in the Go binary** (long-term right;
+aligns with ticket 0057 vision of routing all .erg mutations through
+erg):
+- Add `cmdClose(args []string) int` in `main.go`
+- Locate the ticket file by id, set `Status: closed`, append the status
+  log line `{ts} {actor} status closed — {reason}` (UTC minute), commit
+  the change with the existing `git add tickets/ && git commit -m`
+  pattern (or just leave the commit to the caller; current SKILL.md does
+  it externally)
+- Wire it into the dispatch table at line ~1132 of `main.go`
+- Add Go tests covering: existing open ticket closes; idempotency on a
+  closed ticket; missing id errors cleanly; reason default of `done`
+  when omitted
+
+**Option B — revert merged ticket-close to a Markdown procedure that
+works today** (pragmatic, what 0077 originally proposed):
+- Restore the pre-#85 SKILL.md flow but with the `[reason]` parsing
+- Two-step: edit Status line + append log line; commit
+- Defer the erg-binary delegation until git-erg ships `erg close`
+
+Recommendation: **A**. The branch-as-claim and erg-mutation direction
+is already chosen; one-shot fix here also satisfies the close-path
+slice of ticket 0057.
+
+## Pick-ticket cleanup (regardless of option)
+
+Update `skills/pick-ticket/SKILL.md` step 4:
+
+- Drop the manual `sweep-close: already-done hash:<bodyhash>` log-line
+  append.
+- Call `/ticket-close <id> already-done` (single command, no second
+  step).
+- The status log line `{ts} claude status closed — already-done` then
+  serves the same audit purpose as the current `sweep-close:` line.
+- Update any tests / audit greps to match `status closed — already-done`
+  instead of `sweep-close: already-done`. Or — if the `sweep-close:`
+  audit pattern is more grep-friendly — have the ticket-close skill
+  (Option A: in erg, Option B: in Markdown) emit BOTH a `status` line
+  and a `sweep-close:` line when called with `already-done`. Decide
+  which convention to keep before implementing.
+
+## Test
+
+- Go test: `TestCmdClose` covers the four cases above (Option A only).
+- Bash test: `tests/test_ticket_close_reason.sh`
+  - Create a temp .erg ticket
+  - Invoke `/ticket-close <id> done` (or the underlying `erg close`)
+  - Assert the resulting `Status:` line and the appended status log
+    line match expected patterns
+- Existing pick-ticket tests should be reviewed; the CLOSED-loop test
+  in test_beat.py (PR #89) currently mocks `/ticket-close` so it does
+  not exercise the real bug. Consider an integration test that runs
+  pick-ticket against a fixture and asserts the ticket's `Status:`
+  field is `closed` after the loop.
+
+## Exit criteria
+
+- `/ticket-close <id> [reason]` mutates the ticket file: `Status: closed`
+  + status log line with the reason. Verified by reading the file after
+  the call.
+- pick-ticket no longer hand-writes a `sweep-close:` line; the close
+  path is one command.
+- Existing audit tooling that greps for the close-with-reason pattern
+  continues to match.
+- `MAX_CLOSED_REPICKS=3` no longer fires from already-done loops on a
+  test fixture.
+
+## Notes
+
+Spawned from the 2026-05-03 mecanisation-raid verify pass on PR #90.
+Original ticket 0077 was closed as superseded by PR #85, but PR #85's
+delegation is functionally broken until `erg close` ships — see the
+side-by-side analysis in
+`docs/2026-05-03-raid-mecanisation-phase6-7.md` (and the chat log of
+this raid session).
