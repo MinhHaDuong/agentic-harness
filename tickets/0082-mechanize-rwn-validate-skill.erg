@@ -1,0 +1,30 @@
+%erg v1
+Title: Mechanize related-work-note-validate — extract URL resolution to Python
+Status: open
+Created: 2026-05-03
+Author: claude
+
+--- log ---
+2026-05-03T09:00Z claude created
+
+--- body ---
+## Context
+The related-work-note-validate skill iterates bibliography entries, calls
+WebFetch for each DOI/URL/eprint, and reports PASS/WARN/FAIL. This is a
+mechanical HTTP-fetch loop with deterministic verdict logic. The LLM adds
+no value; it just makes N WebFetch calls and checks HTTP status codes.
+
+## Actions
+1. Implement `~/.claude/scripts/validate-refs.py`:
+   - Reads a related-work-note markdown file (path as arg)
+   - Extracts DOI/URL/arXiv eprint from the Bibliography section
+   - Resolves each via HTTP (requests library, follow doi.org redirects)
+   - Reports per-entry: identifier, resolved URL, HTTP status
+   - Exits with verdict: PASS / WARN (entries with no identifier) / FAIL (fetch failed)
+2. Rewrite skill: call `validate-refs.py <file>`, append provenance bullet on PASS,
+   surface failures for LLM to annotate.
+
+## Exit criteria
+- `~/.claude/scripts/validate-refs.py` exists, runs on a sample note
+- Skill makes one Bash call to the script
+- LLM only handles failure annotation, not the fetch loop

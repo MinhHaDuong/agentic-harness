@@ -1,0 +1,25 @@
+%erg v1
+Title: Mechanize ticket-ready skill — thin wrapper over erg ready
+Status: open
+Created: 2026-05-03
+Author: claude
+
+--- log ---
+2026-05-03T09:00Z claude created
+
+--- body ---
+## Context
+The ticket-ready skill calls `erg ready --json`, parses the JSON, and
+formats a list. This is a display shim with no LLM reasoning. The binary
+already produces the correct list; the skill adds no value beyond formatting.
+
+## Actions
+1. Check if `erg ready` (without --json) produces human-readable output.
+   If yes: replace skill body with `erg ready tickets/`.
+   If no: add a human-readable output mode to `erg ready` (git-erg ticket).
+2. If skill becomes a 1-liner, consider whether it warrants existence at all
+   vs. just documenting `erg ready` in the harness README.
+
+## Exit criteria
+- ticket-ready skill body is ≤5 lines OR skill is removed entirely
+- Running `/ticket-ready` produces the same list as `erg ready tickets/`
