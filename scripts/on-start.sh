@@ -28,6 +28,10 @@ if ! grep -qlF "shell-init.sh" "$HOME/.bashrc" "$HOME/.zshrc" 2>/dev/null; then
     echo "  [ -f \"$_shell_init\" ] && source \"$_shell_init\""
 fi
 
+# Inject the harness-rules index (pointers, not bodies). Agents read
+# individual rule files on demand; verify-adherence checks ex post.
+cat "$_script_dir/../skills/harness-rules/README.md" 2>/dev/null || true
+
 # --- Nothing below this line may produce stdout (hook output = conversation context) ---
 exec >/dev/null 2>&1
 

@@ -31,7 +31,6 @@ Level 4 (Hooks) + raid + `/verify` loop + git-erg tickets + bibliography pipelin
 - 0029 — beat dashboard blocker graph (blocked by 0028)
 - 0034 — housekeeping: split git-cleanup and ticket-scan into two phases
 - 0041 — investigate mid-session context reset between sub-skills
-- 0042 — replace harness-rules with hooks (metaskill panorama finding)
 - 0043 — weekly /fewer-permission-prompts run
 - 0044 — interactive session observer (blocked by 0042)
 - 0047 — auto early context compaction in beat and raid
