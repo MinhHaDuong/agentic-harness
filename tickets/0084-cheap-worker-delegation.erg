@@ -1,0 +1,79 @@
+%erg v1
+Title: Add cheap-worker delegation for I/O-heavy tasks (bulk reads, boilerplate)
+Status: open
+Created: 2026-05-03
+Author: haduong
+
+--- log ---
+2026-05-03T15:00Z haduong created
+
+--- body ---
+## Context
+
+Claude Code's weekly usage limit is finite. nightbeat and raid sessions burn
+through it fast by using the main model for bulk file reads and boilerplate
+generation — both tasks that don't need Claude-level reasoning.
+
+Reference: https://medium.com/@kunalbhardwaj598/i-was-burning-through-claude-codes-weekly-limit-in-3-days-here-s-how-i-fixed-it-0344c555abda
+
+Technique: add CLI tools that delegate to a cheap OpenAI-compatible model
+(e.g. Kimi K2.5 via Moonshot API, or Claude Haiku via Anthropic API), then
+instruct Claude via CLAUDE.md when to delegate. "Claude = thinking. Kimi = I/O."
+
+## Goal
+
+Reduce weekly token burn in nightbeat and interactive sessions by routing
+I/O-heavy tasks to a cheap worker, keeping Claude for reasoning only.
+
+## Proposed tools
+
+1. **`scripts/ask-worker <prompt> [file...]`** — Summarize/read files and return
+   a compact answer. Use when: reading files >400 lines, or reading 3+ files
+   for context gathering. Returns ~400 tokens instead of ~8000.
+
+2. **`scripts/write-worker <prompt>`** — Generate boilerplate (tests, config,
+   repetitive scaffolding). Use when: the pattern is predictable and Claude
+   would just be filling in a template.
+
+Both tools: call a cheap model via OpenAI-compatible API (configurable via
+`WORKER_API_KEY`, `WORKER_BASE_URL`, `WORKER_MODEL` env vars). Falls back
+gracefully to "no worker available" so sessions still work without the config.
+
+## CLAUDE.md additions
+
+Add a delegation rule section:
+
+```
+## Cheap-worker delegation
+When reading files >400 lines, or reading 3+ files for context:
+  run: scripts/ask-worker "<question>" <file1> [file2...]
+When generating predictable boilerplate (test stubs, config files):
+  run: scripts/write-worker "<spec>"
+Never delegate: debugging, safety-critical code, design decisions, doc updates.
+```
+
+## Implementation options
+
+**Option A — Moonshot/Kimi K2.5** (article's approach): cheap, fast, good at
+code reading. Requires `WORKER_BASE_URL=https://api.moonshot.ai/v1`.
+
+**Option B — Claude Haiku via Anthropic API**: same ecosystem, prompt caching
+works, but still burns the weekly Claude.ai limit.
+
+**Option C — Local model via Ollama**: free, no rate limit, slower, quality gap.
+
+Recommendation: **A** with env-var abstraction so any option works.
+
+## Acceptance criteria
+
+- `scripts/ask-worker` reads files and returns compact summary; tested with
+  a >400-line file
+- `scripts/write-worker` generates boilerplate from a spec prompt
+- CLAUDE.md instructs when to delegate with clear boundaries
+- Both tools degrade gracefully (exit 0 with "worker unavailable" message)
+  when WORKER_API_KEY is unset
+- Measured: at least one nightbeat raid session uses the worker at least once
+
+## Effort
+
+Medium — ~2 hours. Two short Python scripts + CLAUDE.md edit + env var setup.
