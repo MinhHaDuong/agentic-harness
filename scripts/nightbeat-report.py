@@ -19,6 +19,7 @@ from pathlib import Path
 
 HARNESS_DIR = Path.home() / ".claude"
 LOGDIR = HARNESS_DIR / "logs" / "nightbeat"
+PERMISSION_DIFFS_DIR = HARNESS_DIR / "telemetry" / "permission-diffs"
 PROJECTS: list[Path] = [
     Path.home() / "aedist-technical-report",
     Path.home() / "cadens",
@@ -271,6 +272,31 @@ def _beat_log_night_summary(proj: Path, since: datetime) -> dict:
     return {"counts": counts, "last": last}
 
 
+# ── Unreviewed permission diffs (ticket 0043) ─────────────────────────────────
+
+
+def _unreviewed_permission_diffs(since: datetime) -> list[tuple[Path, int]]:
+    """Return permission-diff files modified since the report window start.
+
+    These are weekly proposals from /fewer-permission-prompts that have not
+    been reviewed (we treat any file under the dir touched in the window as
+    unreviewed — review = move/delete the file).
+    """
+    if not PERMISSION_DIFFS_DIR.is_dir():
+        return []
+    cutoff = since.timestamp()
+    out: list[tuple[Path, int]] = []
+    for p in sorted(PERMISSION_DIFFS_DIR.glob("*.diff")):
+        try:
+            if p.stat().st_mtime < cutoff:
+                continue
+            line_count = sum(1 for _ in p.open())
+        except OSError:
+            continue
+        out.append((p, line_count))
+    return out
+
+
 # ── Default since ──────────────────────────────────────────────────────────────
 
 
@@ -403,6 +429,16 @@ def main() -> None:
             if issue not in seen:
                 print(f"  {issue}")
                 seen.add(issue)
+
+    # ── Unreviewed permission diffs (ticket 0043) ───────────────────────────────
+    pending = _unreviewed_permission_diffs(since)
+    if pending:
+        print(f"\n{'═' * 72}")
+        print("UNREVIEWED PERMISSION DIFFS")
+        print(f"{'═' * 72}")
+        for path, line_count in pending:
+            print(f"  UNREVIEWED PERMISSION DIFF: {path.name} ({line_count} lines)")
+        print(f"  review at: {PERMISSION_DIFFS_DIR}")
 
     # ── Totals ──────────────────────────────────────────────────────────────────
     n_done = sum(1 for r in runs if r.oc_status == "done")
