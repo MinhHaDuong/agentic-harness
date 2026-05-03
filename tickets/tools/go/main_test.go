@@ -3,6 +3,7 @@ package main
 import (
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -289,5 +290,147 @@ func TestValidateRejectsDuplicateLogSeparator(t *testing.T) {
 	}
 	if !strings.Contains(out, "--- log ---") || !strings.Contains(out, "expected 1") {
 		t.Errorf("error message missing duplicate-separator detail: %s", out)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// hasBranch — git branch claim-check
+// ---------------------------------------------------------------------------
+
+// runGit runs a git command in dir and fails the test if the command errors.
+func runGit(t *testing.T, dir string, args ...string) {
+	t.Helper()
+	cmd := exec.Command("git", args...)
+	cmd.Dir = dir
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("git %s in %s failed: %v\n%s", strings.Join(args, " "), dir, err, out)
+	}
+}
+
+// newGitRepo creates a fresh temp git repo, configures user identity, and
+// chdirs into it. The returned cleanup restores the original cwd. Tests that
+// use this helper must not run in parallel — they all mutate process cwd.
+func newGitRepo(t *testing.T) (string, func()) {
+	t.Helper()
+	repo := t.TempDir()
+	runGit(t, repo, "init", "-q", "-b", "main")
+	runGit(t, repo, "config", "user.email", "test@example.com")
+	runGit(t, repo, "config", "user.name", "test")
+	runGit(t, repo, "config", "commit.gpgsign", "false")
+	runGit(t, repo, "config", "tag.gpgsign", "false")
+	runGit(t, repo, "commit", "--allow-empty", "-q", "-m", "init")
+
+	prev, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+	if err := os.Chdir(repo); err != nil {
+		t.Fatalf("chdir to %s: %v", repo, err)
+	}
+	cleanup := func() {
+		if err := os.Chdir(prev); err != nil {
+			t.Errorf("restore cwd to %s: %v", prev, err)
+		}
+	}
+	t.Cleanup(cleanup)
+	return repo, cleanup
+}
+
+// TestHasBranchLocalMatch covers the happy path: a local branch whose name
+// contains the 4-digit ticket ID makes hasBranch return true.
+func TestHasBranchLocalMatch(t *testing.T) {
+	repo, _ := newGitRepo(t)
+	runGit(t, repo, "checkout", "-q", "-b", "0099-foo")
+
+	if !hasBranch("0099") {
+		t.Errorf("hasBranch(\"0099\") = false, want true (branch 0099-foo exists locally)")
+	}
+}
+
+// TestHasBranchLocalNoMatch covers two negative cases:
+//   1. No matching branch exists in a fresh repo.
+//   2. A matching branch existed but was deleted — hasBranch must return
+//      false again afterwards.
+func TestHasBranchLocalNoMatch(t *testing.T) {
+	repo, _ := newGitRepo(t)
+
+	// Pre-creation: nothing matches 0098.
+	if hasBranch("0098") {
+		t.Errorf("hasBranch(\"0098\") = true before any branch created, want false")
+	}
+
+	// Create then delete a matching branch; final state must report false.
+	runGit(t, repo, "checkout", "-q", "-b", "0098-bar")
+	runGit(t, repo, "checkout", "-q", "main")
+	runGit(t, repo, "branch", "-q", "-D", "0098-bar")
+
+	if hasBranch("0098") {
+		t.Errorf("hasBranch(\"0098\") = true after branch deleted, want false")
+	}
+}
+
+// TestHasBranchRemoteMatch verifies that a branch which exists only on a
+// remote (origin/0099-baz) is detected via the `git branch -r` fallback.
+func TestHasBranchRemoteMatch(t *testing.T) {
+	root := t.TempDir()
+	bare := filepath.Join(root, "bare.git")
+	clone := filepath.Join(root, "clone")
+
+	if err := os.MkdirAll(bare, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(clone, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	runGit(t, bare, "init", "-q", "--bare", "-b", "main")
+
+	runGit(t, clone, "init", "-q", "-b", "main")
+	runGit(t, clone, "config", "user.email", "test@example.com")
+	runGit(t, clone, "config", "user.name", "test")
+	runGit(t, clone, "config", "commit.gpgsign", "false")
+	runGit(t, clone, "config", "tag.gpgsign", "false")
+	runGit(t, clone, "commit", "--allow-empty", "-q", "-m", "init")
+	runGit(t, clone, "remote", "add", "origin", bare)
+	runGit(t, clone, "checkout", "-q", "-b", "0099-baz")
+	runGit(t, clone, "push", "-q", "origin", "0099-baz")
+	// Move local HEAD off the matching branch and delete it locally so the
+	// only place 0099 lives is on origin.
+	runGit(t, clone, "checkout", "-q", "main")
+	runGit(t, clone, "branch", "-q", "-D", "0099-baz")
+	runGit(t, clone, "fetch", "-q", "origin")
+
+	prev, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+	t.Cleanup(func() {
+		if err := os.Chdir(prev); err != nil {
+			t.Errorf("restore cwd: %v", err)
+		}
+	})
+	if err := os.Chdir(clone); err != nil {
+		t.Fatalf("chdir clone: %v", err)
+	}
+
+	if !hasBranch("0099") {
+		t.Errorf("hasBranch(\"0099\") = false, want true (origin/0099-baz exists)")
+	}
+}
+
+// TestHasBranchOfflineFallback verifies that when there is no remote
+// configured (so `git branch -r` returns empty / does not error in a way
+// that propagates), hasBranch returns false rather than panicking. This
+// guards the offline-safe contract documented above the function.
+func TestHasBranchOfflineFallback(t *testing.T) {
+	defer func() {
+		if r := recover(); r != nil {
+			t.Errorf("hasBranch panicked on offline/no-remote repo: %v", r)
+		}
+	}()
+
+	newGitRepo(t)
+	if hasBranch("0099") {
+		t.Errorf("hasBranch(\"0099\") = true on empty no-remote repo, want false")
 	}
 }
