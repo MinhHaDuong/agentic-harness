@@ -127,6 +127,10 @@ systemctl --user daemon-reload
 systemctl --user enable --now claude-harness-pull.timer
 ```
 
+## Permissions
+
+The nightbeat folds in a weekly run of `/fewer-permission-prompts` (Sundays) that proposes an allowlist diff per project. Diffs are never auto-applied; review them at `~/.claude/telemetry/permission-diffs/` — `nightbeat-report` surfaces unreviewed entries each morning.
+
 ## Why not a plugin?
 
 Because it's **my** harness. IDH is my personal Claude config, cloned to `~/.claude` on every machine I use. The plugin system exists for shareable, redistributable tooling — that's not this. Fork the repo if you want your own.

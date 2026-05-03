@@ -62,6 +62,11 @@ MODEL_HAIKU: str = "claude-haiku-4-5-20251001"
 
 PROJECTS_CONFIG: Path = HARNESS_DIR / "scripts" / "projects.json"
 
+# Weekly /fewer-permission-prompts cadence. Folded into nightbeat instead of
+# a dedicated systemd timer (ticket 0043). Lowercase weekday name; matched
+# against datetime.now().strftime("%A").lower().
+PERMISSIONS_PRUNE_DAY_OF_WEEK: str = "sunday"
+
 DRY_RUN: bool = os.environ.get("BEAT_DRY_RUN") == "1"
 
 
@@ -828,6 +833,41 @@ def _ticket_recently_picked(ticket_path: Path, within_hours: int = 8) -> bool:
     return False
 
 
+# ── Weekly /fewer-permission-prompts (ticket 0043) ────────────────────────────
+
+
+def _is_prune_day() -> bool:
+    """True when today's weekday matches PERMISSIONS_PRUNE_DAY_OF_WEEK."""
+    return datetime.now().strftime("%A").lower() == PERMISSIONS_PRUNE_DAY_OF_WEEK
+
+
+def _prune_permissions(project: Path) -> None:
+    """Run the /fewer-permission-prompts helper once a week.
+
+    Diff is written under ~/.claude/telemetry/permission-diffs/<date>.diff and
+    surfaced by nightbeat-report. Diffs are NEVER auto-applied; failure here is
+    benign and must not raise — beat must keep running.
+    """
+    if not _is_prune_day():
+        return
+    helper = HARNESS_DIR / "scripts" / "fewer-permission-prompts-helper.py"
+    try:
+        result = subprocess.run(  # noqa: S603
+            ["python3", str(helper), str(project)],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=10 * 60,
+        )
+        diff_path = (result.stdout or "").strip().splitlines()[-1:] or [""]
+        _log(
+            f"=== permissions-prune: rc={result.returncode}"
+            f" diff={diff_path[0] or '(none)'} {_now_iso()} ==="
+        )
+    except Exception as exc:  # noqa: BLE001 — must never crash beat
+        _log(f"=== permissions-prune: failed silently: {exc} {_now_iso()} ===")
+
+
 def _raid(project: ProjectConfig) -> tuple[str, str | None]:
     """Run the pick→raid sequence; return (outcome, ticket_id)."""
     ticket_id: str | None = None
@@ -852,6 +892,9 @@ def _raid(project: ProjectConfig) -> tuple[str, str | None]:
     ):
         _log("=== pick-ticket: skipped (cooldown-recent-pick) ===")
         return "idle", None
+
+    # Weekly permission-allowlist diff (no-op except on prune day).
+    _prune_permissions(path)
 
     # Pick ticket. Loop on CLOSED (Tier 2 of ticket 0049): pick-ticket may
     # detect that a candidate's exit criteria are already met, close it, and

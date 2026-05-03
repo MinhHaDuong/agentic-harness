@@ -57,3 +57,46 @@ def test_parser_accepts_mixed_labels_in_one_log(tmp_path):
     )
     run = nbr.parse_log(_write_log(tmp_path, body))
     assert run.oc_status == "aborted"
+
+
+# ── Unreviewed permission diffs (ticket 0043) ─────────────────────────────────
+
+
+def test_unreviewed_permission_diffs_picks_recent(tmp_path, monkeypatch):
+    diffs_dir = tmp_path / "permission-diffs"
+    diffs_dir.mkdir()
+    fresh = diffs_dir / "2026-05-03.diff"
+    fresh.write_text("line1\nline2\nline3\n")
+    monkeypatch.setattr(nbr, "PERMISSION_DIFFS_DIR", diffs_dir)
+
+    from datetime import datetime, timedelta, timezone
+
+    since = datetime.now(timezone.utc) - timedelta(hours=1)
+    found = nbr._unreviewed_permission_diffs(since)
+    assert len(found) == 1
+    assert found[0][0] == fresh
+    assert found[0][1] == 3
+
+
+def test_unreviewed_permission_diffs_ignores_old(tmp_path, monkeypatch):
+    import os
+    from datetime import datetime, timedelta, timezone
+
+    diffs_dir = tmp_path / "permission-diffs"
+    diffs_dir.mkdir()
+    old = diffs_dir / "2026-04-01.diff"
+    old.write_text("ancient\n")
+    # Backdate mtime by 30 days.
+    old_ts = (datetime.now() - timedelta(days=30)).timestamp()
+    os.utime(old, (old_ts, old_ts))
+    monkeypatch.setattr(nbr, "PERMISSION_DIFFS_DIR", diffs_dir)
+
+    since = datetime.now(timezone.utc) - timedelta(hours=8)
+    assert nbr._unreviewed_permission_diffs(since) == []
+
+
+def test_unreviewed_permission_diffs_no_dir(tmp_path, monkeypatch):
+    from datetime import datetime, timezone
+
+    monkeypatch.setattr(nbr, "PERMISSION_DIFFS_DIR", tmp_path / "missing")
+    assert nbr._unreviewed_permission_diffs(datetime.now(timezone.utc)) == []

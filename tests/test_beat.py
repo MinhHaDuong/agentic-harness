@@ -1413,3 +1413,57 @@ class TestRaidCooldownRecentPick:
         assert any("pick-ticket" in c for c in calls), (
             "pick-ticket should be invoked when no recent-pick cooldown applies"
         )
+
+
+# ── Weekly /fewer-permission-prompts (ticket 0043) ────────────────────────────
+
+
+class TestWeeklyPermissionsPrune:
+    def test_skipped_on_non_prune_day(self, tmp_path, monkeypatch):
+        called = {"v": False}
+
+        def fake_run(*a, **k):
+            called["v"] = True
+            return MagicMock(returncode=0, stdout=b"")
+
+        monkeypatch.setattr(beat, "_is_prune_day", lambda: False)
+        monkeypatch.setattr(beat.subprocess, "run", fake_run)
+        beat._prune_permissions(tmp_path)
+        assert called["v"] is False
+
+    def test_runs_on_prune_day(self, tmp_path, monkeypatch):
+        called = {"v": False}
+
+        def fake_run(*a, **k):
+            called["v"] = True
+            return MagicMock(returncode=0, stdout=b"")
+
+        monkeypatch.setattr(beat, "_is_prune_day", lambda: True)
+        monkeypatch.setattr(beat.subprocess, "run", fake_run)
+        beat._prune_permissions(tmp_path)
+        assert called["v"] is True
+
+    def test_failure_does_not_raise(self, tmp_path, monkeypatch):
+        def boom(*a, **k):
+            raise OSError("simulated failure")
+
+        monkeypatch.setattr(beat, "_is_prune_day", lambda: True)
+        monkeypatch.setattr(beat.subprocess, "run", boom)
+        # Must not propagate.
+        beat._prune_permissions(tmp_path)
+
+    def test_is_prune_day_uses_config(self, monkeypatch):
+        # Force the configured day to a deterministic weekday name.
+        from datetime import datetime as _dt
+
+        class _FakeDT(_dt):
+            @classmethod
+            def now(cls, tz=None):  # noqa: ARG002 — match signature
+                return _dt(2026, 5, 3)  # Sunday
+
+        monkeypatch.setattr(beat, "PERMISSIONS_PRUNE_DAY_OF_WEEK", "sunday")
+        monkeypatch.setattr(beat, "datetime", _FakeDT)
+        assert beat._is_prune_day() is True
+
+        monkeypatch.setattr(beat, "PERMISSIONS_PRUNE_DAY_OF_WEEK", "monday")
+        assert beat._is_prune_day() is False
