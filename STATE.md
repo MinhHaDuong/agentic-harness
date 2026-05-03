@@ -1,6 +1,6 @@
 # Imperial Dragon Harness — State
 
-Last updated: 2026-05-02T23:00Z
+Last updated: 2026-05-03T15:00Z
 
 ## North star
 
@@ -14,13 +14,13 @@ Level 4 (Hooks) + raid + `/verify` loop + git-erg tickets + bibliography pipelin
 
 **Nightbeat** (`claude-nightbeat.timer`) live on padme. Fires every 30 min 22:00–06:00 weeknights, every 30 min all day weekends (17 runs/night). `beat.py` controls flow in Python — no LLM orchestrator. Per-project lock allows concurrent beats. `project_scoped=True` prevents cross-project ticket leakage.
 
-**Per-project budgets**: `ProjectConfig` dataclass in `beat.py` — aedist-technical-report, chemin-de-voix, git-erg at $0.40/$0.50. 3 targets (`scripts/projects.json`). Ticket 0069 open to move config into per-project `.claude/beat.json`.
+**Per-project budgets**: `ProjectConfig` dataclass in `beat.py` — all projects at $0.40/$0.50. 5 targets in `scripts/projects.json` (aedist-technical-report, chemin-de-voix, git-erg, Climate_finance, fuzzy-corpus). Ticket 0069 open to move config into per-project `.claude/beat.json`.
 
 **Idle skip**: housekeeping skipped when repo has no commits since last run (ticket 0036 closed).
 
 **erg sweep cache**: `erg ready --json` returns `cache`/`hash` per ticket. `erg sweep-skip` and `erg sweep-write` compute hash server-side. Pick-ticket reads ticket bodies only on cache:miss. 96 pytest + 27 Go tests, all green. Skills resolve erg binary as `${ERG:-erg}` for PATH portability.
 
-**git-erg**: pre-commit hooks installed in all projects. CI added (ticket 0009, PR #4 ready to merge).
+**git-erg**: pre-commit hooks installed in all projects. CI live (ticket 0009, PR #4 merged).
 
 **Worktree lifecycle**: worktrees created via `Agent(isolation:"worktree")` are harness-managed. Skills must not rm them manually. Raid wrap-up step "Clean up worktrees" removed (2026-04-30).
 
@@ -31,13 +31,12 @@ Level 4 (Hooks) + raid + `/verify` loop + git-erg tickets + bibliography pipelin
 - 0029 — beat dashboard blocker graph (blocked by 0028)
 - 0034 — housekeeping: split git-cleanup and ticket-scan into two phases
 - 0041 — investigate mid-session context reset between sub-skills
-- 0044 — interactive session observer (blocked by 0042)
+- 0044 — interactive session observer
 - 0047 — auto early context compaction in beat and raid
 - 0049 — truth in ticket open status
 - 0051 — beat should try another project when current one is idle or frozen
 - 0052 — beat erg edit permission denied
 - 0057 — route .erg mutations through erg binary (blocked by erg binary exposing mutation commands)
-- 0058 — rewrite README with Imperial Dragon voice (remove GSD, new opener)
 - 0059 — simplify pick-ticket to delegate to `erg pick`
 - 0061 — sequence parallel agents to stay under budget (corpus discovery fanout crash)
 - 0062 — run nightbeat from a VM (uptime + bypass Gallica 403 blocks)
@@ -48,7 +47,11 @@ Level 4 (Hooks) + raid + `/verify` loop + git-erg tickets + bibliography pipelin
 - 0068 — two-word canonical names + IDH aliases for all skills
 - 0069 — per-project beat config (.claude/beat.json) with interval_minutes
 - 0070 — /dream skill — autonomous nightly memory consolidation
-- 0075 — audit disable-model-invocation in ticket-* skills
+- 0079 — mechanize smoke skill — extract shell steps to bash script
+- 0080 — move beat run-summary into beat.py (eliminate JSONL parsing from skill)
+- 0081 — mechanize bib-merge — extract deduplication to Python script
+- 0082 — mechanize related-work-note-validate — extract URL resolution to Python
+- 0083 — mechanize ticket-ready — thin wrapper over `erg ready`
 - 0054 — [discussion] restore Five-Claws phase announcement at session start
 - 0055 — [discussion] milestone/epic layer above tickets
 - 0056 — [discussion] mid-session pause/resume checkpoints
