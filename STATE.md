@@ -51,6 +51,7 @@ Level 4 (Hooks) + raid + `/verify` loop + git-erg tickets + bibliography pipelin
 - 0069 — per-project beat config (.claude/beat.json) with interval_minutes
 - 0070 — /dream skill — autonomous nightly memory consolidation
 - 0073 — hasBranch unit test (gap found in PR #81 review)
+- 0075 — audit disable-model-invocation in ticket-* skills
 - 0054 — [discussion] restore Five-Claws phase announcement at session start
 - 0055 — [discussion] milestone/epic layer above tickets
 - 0056 — [discussion] mid-session pause/resume checkpoints
