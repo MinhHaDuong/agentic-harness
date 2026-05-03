@@ -99,14 +99,13 @@ Select one ticket for the current sweep run.
    2. Then by lowest risk
    3. If risk is equal, prefer the simpler one
 
-6. **Write beat-skip updates.** Merge all new skip entries (from step 3) plus
-   a cooldown entry for the picked ticket into `.git/beat-skip.json`,
-   replacing any existing entry with the same `id`. No ticket files are
-   modified. No commit needed — beat-skip is machine-local state.
+6. **Write beat-skip updates.** Merge all new skip entries (from step 3)
+   into `.git/beat-skip.json`, replacing any existing entry with the same
+   `id`. No ticket files are modified. No commit needed — beat-skip is
+   machine-local state.
 
-   Always add a cooldown entry for the picked ticket (prevents re-picking on
-   the next beat before the raid has a chance to close it):
-   `{ "id": "...", "until": "{now+8h}", "reason": "cooldown-recent-pick" }`
+   Cooldown is enforced in beat.py via _ticket_recently_picked(); no
+   beat-skip entry needed for the picked ticket.
 
 7. If the candidate set is empty after all exclusions, output
    `IDLE: no eligible tickets` and stop.
