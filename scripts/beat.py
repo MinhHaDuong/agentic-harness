@@ -46,6 +46,9 @@ HOUSEKEEPING_SAFETY_FLOOR_S: int = 24 * 3600
 HOUSEKEEPING_TIMEOUT_S: int = 10 * 60
 PICK_TICKET_TIMEOUT_S: int = 8 * 60
 RAID_TIMEOUT_S: int = 30 * 60
+# Max consecutive CLOSED:<id> repicks per beat before aborting to idle.
+# Tier 2 of ticket 0049: bound prevents flaky exit-criteria from looping forever.
+MAX_CLOSED_REPICKS: int = 3
 CRASH_RECOVERY_WINDOW_S: int = 55 * 60
 LOG_RETAIN_COUNT: int = 60
 TIMEOUT_EXIT_CODE: int = 124  # matches bash `timeout` convention
@@ -364,12 +367,29 @@ def _repo_active(project: Path) -> bool:
 # ── Pick-ticket output parser ─────────────────────────────────────────────────
 
 
-def parse_pick(result_text: str) -> str | None:
-    """Return 4-digit ticket ID from PICK: line, or None for IDLE / no match."""
+def parse_pick(result_text: str) -> tuple[str, str | None]:
+    """Classify pick-ticket output.
+
+    Returns a (status, ticket_id) tuple where status is one of:
+      - "pick":   `PICK: <id>` matched; ticket_id is the 4-digit string.
+      - "closed": `CLOSED: <id>` matched (Tier 2, ticket 0049) — pick-ticket
+                  detected the ticket's exit criteria are already met and
+                  closed it; caller should re-pick. ticket_id is the 4-digit
+                  string of the closed ticket.
+      - "idle":   No eligible candidate, or unparseable output. ticket_id
+                  is None.
+
+    Precedence: IDLE > CLOSED > PICK. IDLE always wins (safety bias).
+    """
     if re.search(r"\bIDLE\b", result_text, re.IGNORECASE):
-        return None
-    m = re.search(r"\bPICK:\s*(\d{4})\b", result_text)
-    return m.group(1) if m else None
+        return ("idle", None)
+    closed = re.search(r"\bCLOSED:\s*(\d{4})\b", result_text)
+    if closed:
+        return ("closed", closed.group(1))
+    pick = re.search(r"\bPICK:\s*(\d{4})\b", result_text)
+    if pick:
+        return ("pick", pick.group(1))
+    return ("idle", None)
 
 
 # ── Claude subprocess ──────────────────────────────────────────────────────────
@@ -798,26 +818,52 @@ def _raid(project: ProjectConfig) -> tuple[str, str | None]:
     if hk_outcome in ("failed", "timeout", "ci-failed"):
         return "aborted", None
 
-    # Pick ticket
+    # Pick ticket. Loop on CLOSED (Tier 2 of ticket 0049): pick-ticket may
+    # detect that a candidate's exit criteria are already met, close it, and
+    # emit `CLOSED: <id>` — re-pick rather than raid a stale ticket. Bound
+    # at MAX_CLOSED_REPICKS to prevent flaky exit-criteria from looping
+    # forever (abort to idle so the next beat can try again).
     hostname = socket.gethostname()
     pick_model = MODEL_SONNET if _repo_active(path) else project.pick_ticket_model
-    _log(f"=== pick-ticket: running model={pick_model} {_now_iso()} ===")
-    pt_rc, pt_result = run_skill(
-        f"/pick-ticket\n\nRunning on: {hostname}",
-        budget=project.budget_pick_ticket,
-        timeout_s=PICK_TICKET_TIMEOUT_S,
-        cwd=path,
-        project_scoped=True,
-        model=pick_model,
-    )
+    closed_attempts = 0
+    ticket_id = None
+    pt_result = ""
+    while closed_attempts < MAX_CLOSED_REPICKS:
+        _log(f"=== pick-ticket: running model={pick_model} {_now_iso()} ===")
+        pt_rc, pt_result = run_skill(
+            f"/pick-ticket\n\nRunning on: {hostname}",
+            budget=project.budget_pick_ticket,
+            timeout_s=PICK_TICKET_TIMEOUT_S,
+            cwd=path,
+            project_scoped=True,
+            model=pick_model,
+        )
 
-    if pt_rc == TIMEOUT_EXIT_CODE:
-        return "aborted", None
-    if pt_rc != 0:
-        return "failed", None
+        if pt_rc == TIMEOUT_EXIT_CODE:
+            return "aborted", None
+        if pt_rc != 0:
+            return "failed", None
 
-    ticket_id = parse_pick(pt_result)
-    if ticket_id is None:
+        status, ticket_id = parse_pick(pt_result)
+        if status == "closed":
+            closed_attempts += 1
+            _log(
+                f"=== pick-ticket: closed {ticket_id}, repicking"
+                f" (attempt {closed_attempts}/{MAX_CLOSED_REPICKS}) ==="
+            )
+            continue
+        break
+    else:
+        # while-else: ran MAX_CLOSED_REPICKS times without breaking → all
+        # attempts returned CLOSED. Abort to idle so the orchestrator never
+        # raids a ticket that may be already done.
+        _log(
+            f"=== pick-ticket: idle — {MAX_CLOSED_REPICKS} consecutive CLOSED"
+            " picks; aborting beat to avoid loop ==="
+        )
+        return "idle", None
+
+    if status == "idle":
         last_result_line = (
             pt_result.strip().splitlines()[-1] if pt_result.strip() else ""
         )
