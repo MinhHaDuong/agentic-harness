@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -432,5 +433,115 @@ func TestHasBranchOfflineFallback(t *testing.T) {
 	newGitRepo(t)
 	if hasBranch("0099") {
 		t.Errorf("hasBranch(\"0099\") = true on empty no-remote repo, want false")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// closeTicket — erg close subcommand (ticket 0078)
+// ---------------------------------------------------------------------------
+
+// TestCmdCloseOpenTicket: closing an open ticket sets Status: closed and
+// appends a `claude status closed — <reason>` log line with a UTC minute
+// timestamp.
+func TestCmdCloseOpenTicket(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "0001-alpha.erg")
+	if err := os.WriteFile(path, []byte(minimalErgWithStatus("0001", "open")), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	exit, msg := closeTicket(dir, "0001", "done")
+	if exit != 0 {
+		t.Fatalf("expected exit 0, got %d (msg: %s)", exit, msg)
+	}
+	if !strings.Contains(msg, "closed 0001") {
+		t.Errorf("expected success message to mention closed 0001, got: %s", msg)
+	}
+
+	parsed := parseErg(path)
+	if parsed.Status() != "closed" {
+		t.Errorf("expected Status: closed, got %q", parsed.Status())
+	}
+
+	// The last log line should match the status-closed pattern.
+	if len(parsed.LogLines) == 0 {
+		t.Fatalf("expected at least one log line, got 0")
+	}
+	last := parsed.LogLines[len(parsed.LogLines)-1]
+	wantRE := regexp.MustCompile(`^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}Z claude status closed — done$`)
+	if !wantRE.MatchString(last) {
+		t.Errorf("last log line %q did not match expected pattern", last)
+	}
+}
+
+// TestCmdCloseIdempotent: closing an already-closed ticket does not append
+// another log line and returns exit 0.
+func TestCmdCloseIdempotent(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "0001-alpha.erg")
+	if err := os.WriteFile(path, []byte(minimalErgWithStatus("0001", "closed")), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	before := parseErg(path)
+	beforeCount := len(before.LogLines)
+
+	exit, msg := closeTicket(dir, "0001", "done")
+	if exit != 0 {
+		t.Fatalf("expected exit 0 on idempotent close, got %d (msg: %s)", exit, msg)
+	}
+	if !strings.Contains(msg, "already closed") {
+		t.Errorf("expected idempotent message to mention 'already closed', got: %s", msg)
+	}
+
+	after := parseErg(path)
+	afterCount := len(after.LogLines)
+	if afterCount != beforeCount {
+		t.Errorf("expected log line count unchanged (%d), got %d", beforeCount, afterCount)
+	}
+	if after.Status() != "closed" {
+		t.Errorf("Status should remain closed, got %q", after.Status())
+	}
+}
+
+// TestCmdCloseMissingID: closing a non-existent ticket returns non-zero.
+func TestCmdCloseMissingID(t *testing.T) {
+	dir := t.TempDir()
+	exit, msg := closeTicket(dir, "9999", "done")
+	if exit == 0 {
+		t.Fatalf("expected non-zero exit for missing id, got 0 (msg: %s)", msg)
+	}
+	if !strings.Contains(msg, "9999") {
+		t.Errorf("expected error to mention id 9999, got: %s", msg)
+	}
+}
+
+// TestCmdCloseDefaultReason: when closeTicket is called with an empty
+// reason, it falls back to defaultCloseReason ("done") and the resulting
+// log line ends in `— done`. This covers the cmdClose dispatch default
+// without forcing a chdir.
+func TestCmdCloseDefaultReason(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "0001-alpha.erg")
+	if err := os.WriteFile(path, []byte(minimalErgWithStatus("0001", "open")), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Empty reason → must default to "done".
+	exit, _ := closeTicket(dir, "0001", "")
+	if exit != 0 {
+		t.Fatalf("expected exit 0, got %d", exit)
+	}
+	if defaultCloseReason != "done" {
+		t.Errorf("expected defaultCloseReason 'done', got %q", defaultCloseReason)
+	}
+
+	parsed := parseErg(path)
+	if len(parsed.LogLines) == 0 {
+		t.Fatalf("expected at least one log line")
+	}
+	last := parsed.LogLines[len(parsed.LogLines)-1]
+	if !strings.HasSuffix(last, "— done") {
+		t.Errorf("last log line should end with '— done', got: %q", last)
 	}
 }

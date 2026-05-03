@@ -8,6 +8,7 @@
 //	erg archive  [dir] [--days N] [--execute]
 //	erg graph    [dir] [--json]
 //	erg next-id  [dir]
+//	erg close    <id> [reason]
 package main
 
 import (
@@ -1081,6 +1082,166 @@ func cmdNextID(args []string) int {
 }
 
 // ---------------------------------------------------------------------------
+// Close — mark a ticket closed and append a status log line
+// ---------------------------------------------------------------------------
+
+const defaultCloseReason = "done"
+
+// closeTicket marks the ticket with the given id (4-digit prefix) as closed
+// and appends a `{ts} claude status closed — {reason}` log line.
+//
+// Behavior:
+//   - If no ticket file matches `<dir>/<id>-*.erg`, returns (1, error message).
+//   - If multiple files match, returns (1, error message).
+//   - If the ticket is already `Status: closed`, no file mutation happens
+//     and (0, "ticket <id> already closed") is returned.
+//   - Otherwise, replaces the first `Status: open` line in the headers
+//     section (everything before `--- log ---`) with `Status: closed` and
+//     appends the status log line immediately after the last non-empty log
+//     line, returning (0, "closed <id>: <reason>").
+func closeTicket(dir, id, reason string) (int, string) {
+	if reason == "" {
+		reason = defaultCloseReason
+	}
+
+	pattern := filepath.Join(dir, id+"-*.erg")
+	matches, err := filepath.Glob(pattern)
+	if err != nil {
+		return 1, fmt.Sprintf("erg close: glob error: %v", err)
+	}
+	if len(matches) == 0 {
+		return 1, fmt.Sprintf("erg close: no ticket found for id %s in %s", id, dir)
+	}
+	if len(matches) > 1 {
+		return 1, fmt.Sprintf("erg close: multiple tickets matched id %s: %s", id, strings.Join(matches, ", "))
+	}
+
+	path := matches[0]
+	info, err := os.Stat(path)
+	if err != nil {
+		return 1, fmt.Sprintf("erg close: stat %s: %v", path, err)
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return 1, fmt.Sprintf("erg close: read %s: %v", path, err)
+	}
+
+	content := string(data)
+
+	// Locate the log and body separators. Operate only on the headers slice
+	// when rewriting Status, and insert the new log line just before
+	// `--- body ---`, immediately after the last non-empty log line.
+	logSep := "--- log ---"
+	bodySep := "--- body ---"
+	logIdx := strings.Index(content, "\n"+logSep+"\n")
+	if logIdx < 0 {
+		// allow leading/no preceding newline — fall back to substring search
+		logIdx = strings.Index(content, logSep)
+		if logIdx < 0 {
+			return 1, fmt.Sprintf("erg close: %s missing %q separator", path, logSep)
+		}
+	} else {
+		logIdx++ // skip the leading newline so logIdx points at logSep
+	}
+	bodyIdx := strings.Index(content, "\n"+bodySep+"\n")
+	if bodyIdx < 0 {
+		bodyIdx = strings.Index(content, bodySep)
+		if bodyIdx < 0 {
+			return 1, fmt.Sprintf("erg close: %s missing %q separator", path, bodySep)
+		}
+	} else {
+		bodyIdx++
+	}
+
+	// Idempotency: re-parse the file to check current Status.
+	t := parseErg(path)
+	if t.Status() == "closed" {
+		return 0, fmt.Sprintf("ticket %s already closed", id)
+	}
+
+	headersSlice := content[:logIdx]
+	logSlice := content[logIdx:bodyIdx]
+	bodySlice := content[bodyIdx:]
+
+	// Rewrite first `Status: open` line in headers slice.
+	statusRE := regexp.MustCompile(`(?m)^Status: open$`)
+	loc := statusRE.FindStringIndex(headersSlice)
+	if loc == nil {
+		return 1, fmt.Sprintf("erg close: %s has no `Status: open` header line", path)
+	}
+	newHeaders := headersSlice[:loc[0]] + "Status: closed" + headersSlice[loc[1]:]
+
+	// Build the new log line and insert into logSlice.
+	ts := time.Now().UTC().Format("2006-01-02T15:04Z")
+	newLogLine := fmt.Sprintf("%s claude status closed — %s", ts, reason)
+
+	// Find the last non-empty log line and insert immediately after it.
+	// logSlice currently looks like: "--- log ---\n<entries...>\n" up to the
+	// position of `--- body ---`.
+	// We split on "\n", find the last index of a non-empty trimmed line,
+	// then re-join with the new line inserted right after it.
+	logLines := strings.Split(logSlice, "\n")
+	lastNonEmpty := -1
+	for i, ln := range logLines {
+		if strings.TrimSpace(ln) == "" {
+			continue
+		}
+		if ln == logSep {
+			continue
+		}
+		lastNonEmpty = i
+	}
+	if lastNonEmpty < 0 {
+		// No existing log entries — insert directly after the separator.
+		// Find the separator index in the slice.
+		for i, ln := range logLines {
+			if ln == logSep {
+				lastNonEmpty = i
+				break
+			}
+		}
+	}
+	// Insert newLogLine after lastNonEmpty.
+	out := make([]string, 0, len(logLines)+1)
+	out = append(out, logLines[:lastNonEmpty+1]...)
+	out = append(out, newLogLine)
+	out = append(out, logLines[lastNonEmpty+1:]...)
+	newLogSlice := strings.Join(out, "\n")
+
+	newContent := newHeaders + newLogSlice + bodySlice
+
+	if err := os.WriteFile(path, []byte(newContent), info.Mode().Perm()); err != nil {
+		return 1, fmt.Sprintf("erg close: write %s: %v", path, err)
+	}
+	return 0, fmt.Sprintf("closed %s: %s", id, reason)
+}
+
+// cmdClose parses CLI args and calls closeTicket. Args layout:
+//
+//	[<id>] [<reason-words...>]
+//
+// If multiple words follow <id>, they are joined with single spaces to form
+// the reason. Default reason: "done".
+func cmdClose(args []string) int {
+	if len(args) == 0 {
+		fmt.Fprintln(os.Stderr, "erg close: usage: erg close <id> [reason]")
+		return 1
+	}
+	id := args[0]
+	reason := defaultCloseReason
+	if len(args) > 1 {
+		reason = strings.Join(args[1:], " ")
+	}
+	exit, msg := closeTicket("tickets", id, reason)
+	if exit == 0 {
+		fmt.Println(msg)
+	} else {
+		fmt.Fprintln(os.Stderr, msg)
+	}
+	return exit
+}
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
@@ -1116,6 +1277,7 @@ func printUsage() {
 	fmt.Fprintln(os.Stderr, "  archive [dir] [--days N] [--execute]  Archive old closed tickets")
 	fmt.Fprintln(os.Stderr, "  graph [dir] [--json]                Show ticket dependency DAG")
 	fmt.Fprintln(os.Stderr, "  next-id [dir]                       Print the next available ticket ID")
+	fmt.Fprintln(os.Stderr, "  close <id> [reason]                 Mark a ticket closed with a status log line")
 }
 
 func main() {
@@ -1139,6 +1301,8 @@ func main() {
 		exitCode = cmdGraph(rest)
 	case "next-id":
 		exitCode = cmdNextID(rest)
+	case "close":
+		exitCode = cmdClose(rest)
 	case "-h", "--help", "help":
 		printUsage()
 		exitCode = 0
