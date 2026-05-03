@@ -47,43 +47,72 @@ def beat_log(tmp_project):
 
 class TestParsePick:
     def test_pick_exact(self):
-        assert beat.parse_pick("PICK: 0023") == "0023"
+        assert beat.parse_pick("PICK: 0023") == ("pick", "0023")
 
     def test_pick_with_leading_prose(self):
-        assert beat.parse_pick("After reviewing tickets, PICK: 0111") == "0111"
+        assert beat.parse_pick("After reviewing tickets, PICK: 0111") == (
+            "pick",
+            "0111",
+        )
 
     def test_pick_multiline(self):
-        assert beat.parse_pick("Thinking...\nPICK: 0042\nDone.") == "0042"
+        assert beat.parse_pick("Thinking...\nPICK: 0042\nDone.") == ("pick", "0042")
 
     def test_pick_no_space(self):
         # "PICK:0023" without space — regex requires \s* so this matches
-        assert beat.parse_pick("PICK:0023") == "0023"
+        assert beat.parse_pick("PICK:0023") == ("pick", "0023")
 
     def test_idle_keyword(self):
-        assert beat.parse_pick("IDLE: no eligible tickets") is None
+        assert beat.parse_pick("IDLE: no eligible tickets") == ("idle", None)
 
     def test_idle_case_insensitive(self):
-        assert beat.parse_pick("idle: nothing to do") is None
+        assert beat.parse_pick("idle: nothing to do") == ("idle", None)
 
     def test_idle_takes_precedence_over_pick(self):
         # If both appear, IDLE wins (safety bias)
-        assert beat.parse_pick("IDLE: queue empty\nPICK: 0007") is None
+        assert beat.parse_pick("IDLE: queue empty\nPICK: 0007") == ("idle", None)
 
     def test_ambiguous_no_keyword(self):
-        assert beat.parse_pick("I reviewed the tickets and found nothing") is None
+        assert beat.parse_pick("I reviewed the tickets and found nothing") == (
+            "idle",
+            None,
+        )
 
     def test_empty_string(self):
-        assert beat.parse_pick("") is None
+        assert beat.parse_pick("") == ("idle", None)
 
     def test_pick_must_be_four_digits(self):
         # Three-digit ID should not match \d{4}
-        assert beat.parse_pick("PICK: 042") is None
+        assert beat.parse_pick("PICK: 042") == ("idle", None)
 
     def test_pick_five_digits_no_match(self):
-        assert beat.parse_pick("PICK: 00042") is None
+        assert beat.parse_pick("PICK: 00042") == ("idle", None)
 
     def test_dry_run_sentinel(self):
-        assert beat.parse_pick("PICK: 9999") == "9999"
+        assert beat.parse_pick("PICK: 9999") == ("pick", "9999")
+
+    def test_closed_signal_parsing(self):
+        # Tier 2 (ticket 0049): pick-ticket emits CLOSED: <id> when it
+        # detects a ticket whose exit criteria are already met.
+        status, ticket_id = beat.parse_pick("CLOSED: 0049")
+        assert status == "closed"
+        assert ticket_id == "0049"
+
+    def test_closed_with_prose(self):
+        status, ticket_id = beat.parse_pick(
+            "Exit criteria already met.\nCLOSED: 0039\nMoving on."
+        )
+        assert status == "closed"
+        assert ticket_id == "0039"
+
+    def test_closed_must_be_four_digits(self):
+        # Mirror PICK behavior: only 4-digit IDs match.
+        assert beat.parse_pick("CLOSED: 042") == ("idle", None)
+
+    def test_idle_takes_precedence_over_closed(self):
+        # If pick-ticket emits both CLOSED and IDLE, IDLE wins (safety bias):
+        # treat as idle so beat.py doesn't loop on a malformed transcript.
+        assert beat.parse_pick("CLOSED: 0049\nIDLE: nothing left") == ("idle", None)
 
 
 # ── housekeeping_needed ────────────────────────────────────────────────────────
@@ -507,6 +536,103 @@ class TestRaid:
             beat._raid(beat.ProjectConfig(path=tmp_project))
 
         assert not any("housekeeping" in c for c in calls)
+
+
+# ── _raid CLOSED-loop (ticket 0049 Tier 2) ────────────────────────────────────
+
+
+class TestRaidClosedLoop:
+    """Tier 2 of ticket 0049: pick-ticket may emit `CLOSED: <id>` when it
+    detects an already-done ticket. _raid must loop and re-pick rather than
+    invoking the orchestrator on a stale pick. A bound prevents flaky exit
+    criteria from looping forever."""
+
+    def setup_method(self):
+        beat.DRY_RUN = False
+
+    def test_closed_then_pick_loops_back(self, tmp_project):
+        """First pick-ticket call returns CLOSED; second returns PICK.
+        _raid must call pick-ticket twice, then proceed to raid."""
+        pick_results = iter(
+            [
+                (0, "CLOSED: 0049"),
+                (0, "PICK: 0050"),
+            ]
+        )
+        calls: list[str] = []
+
+        def fake_run_skill(skill, **kwargs):
+            calls.append(skill)
+            if "pick-ticket" in skill:
+                return next(pick_results)
+            if "raid" in skill:
+                return (0, "")
+            return (0, "")
+
+        with (
+            patch("beat.housekeeping_needed", return_value=False),
+            patch("beat.run_skill", side_effect=fake_run_skill),
+        ):
+            outcome, ticket = beat._raid(beat.ProjectConfig(path=tmp_project))
+
+        pick_calls = [c for c in calls if "pick-ticket" in c]
+        assert len(pick_calls) == 2
+        assert outcome == "done"
+        assert ticket == "0050"
+
+    def test_consecutive_closed_aborts_to_idle(self, tmp_project):
+        """Three consecutive CLOSED picks → idle (loop guard).
+
+        Bound: max 3 consecutive CLOSED before aborting. Prevents flaky
+        exit-criteria checks from looping forever."""
+        calls: list[str] = []
+
+        def fake_run_skill(skill, **kwargs):
+            calls.append(skill)
+            if "pick-ticket" in skill:
+                return (0, "CLOSED: 0049")
+            return (0, "")
+
+        with (
+            patch("beat.housekeeping_needed", return_value=False),
+            patch("beat.run_skill", side_effect=fake_run_skill),
+        ):
+            outcome, ticket = beat._raid(beat.ProjectConfig(path=tmp_project))
+
+        pick_calls = [c for c in calls if "pick-ticket" in c]
+        # 3 attempts max
+        assert len(pick_calls) == 3
+        # No raid invocation — never reached PICK
+        assert not any("raid" in c and "pick-ticket" not in c for c in calls)
+        assert outcome == "idle"
+        assert ticket is None
+
+    def test_closed_then_idle_returns_idle(self, tmp_project):
+        """CLOSED on first call, IDLE on second → idle (no raid)."""
+        pick_results = iter(
+            [
+                (0, "CLOSED: 0049"),
+                (0, "IDLE: nothing left"),
+            ]
+        )
+        calls: list[str] = []
+
+        def fake_run_skill(skill, **kwargs):
+            calls.append(skill)
+            if "pick-ticket" in skill:
+                return next(pick_results)
+            return (0, "")
+
+        with (
+            patch("beat.housekeeping_needed", return_value=False),
+            patch("beat.run_skill", side_effect=fake_run_skill),
+        ):
+            outcome, ticket = beat._raid(beat.ProjectConfig(path=tmp_project))
+
+        pick_calls = [c for c in calls if "pick-ticket" in c]
+        assert len(pick_calls) == 2
+        assert outcome == "idle"
+        assert ticket is None
 
 
 # ── housekeeping phase: dedicated branch + PR flow (ticket 0072) ──────────────
