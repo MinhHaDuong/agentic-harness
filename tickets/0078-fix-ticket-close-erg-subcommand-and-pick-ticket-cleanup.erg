@@ -1,11 +1,12 @@
 %erg v1
 Title: Fix /ticket-close — add erg close subcommand and clean up pick-ticket
-Status: open
+Status: closed
 Created: 2026-05-03
 Author: claude
 
 --- log ---
 2026-05-03T16:30Z claude created
+2026-05-03T15:13Z claude status closed — done
 
 --- body ---
 ## Context
