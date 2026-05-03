@@ -1,12 +1,13 @@
 %erg v1
 Title: Stop leaking API keys in ps -ef via CLAUDE_ENV_FILE
-Status: open
+Status: closed
 Created: 2026-05-03
 Author: claude
 
 --- log ---
 2026-05-03T10:00Z claude created
 2026-05-03T10:00Z claude linked gh#83
+2026-05-03T10:30Z claude closed — gh#83 merged, all exit criteria met
 
 --- body ---
 ## Problem
