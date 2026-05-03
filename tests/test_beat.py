@@ -1427,6 +1427,7 @@ class TestWeeklyPermissionsPrune:
             return MagicMock(returncode=0, stdout=b"")
 
         monkeypatch.setattr(beat, "_is_prune_day", lambda: False)
+        monkeypatch.setattr(beat, "HARNESS_DIR", tmp_path)
         monkeypatch.setattr(beat.subprocess, "run", fake_run)
         beat._prune_permissions(tmp_path)
         assert called["v"] is False
@@ -1439,15 +1440,40 @@ class TestWeeklyPermissionsPrune:
             return MagicMock(returncode=0, stdout=b"")
 
         monkeypatch.setattr(beat, "_is_prune_day", lambda: True)
+        monkeypatch.setattr(beat, "HARNESS_DIR", tmp_path)
         monkeypatch.setattr(beat.subprocess, "run", fake_run)
         beat._prune_permissions(tmp_path)
         assert called["v"] is True
+
+    def test_skipped_when_today_diff_exists(self, tmp_path, monkeypatch):
+        """Once-per-day guard: helper not invoked if today's diff already exists."""
+        called = {"v": False}
+
+        def fake_run(*a, **k):
+            called["v"] = True
+            return MagicMock(returncode=0, stdout=b"")
+
+        monkeypatch.setattr(beat, "_is_prune_day", lambda: True)
+        monkeypatch.setattr(beat, "HARNESS_DIR", tmp_path)
+        monkeypatch.setattr(beat.subprocess, "run", fake_run)
+
+        diffs = tmp_path / "telemetry" / "permission-diffs"
+        diffs.mkdir(parents=True)
+        today = datetime.now().strftime("%Y-%m-%d")
+        (diffs / f"{today}.diff").write_text("# already produced earlier today\n")
+
+        beat._prune_permissions(tmp_path)
+        assert called["v"] is False, (
+            "second invocation on the same day must short-circuit before"
+            " spawning the helper"
+        )
 
     def test_failure_does_not_raise(self, tmp_path, monkeypatch):
         def boom(*a, **k):
             raise OSError("simulated failure")
 
         monkeypatch.setattr(beat, "_is_prune_day", lambda: True)
+        monkeypatch.setattr(beat, "HARNESS_DIR", tmp_path)
         monkeypatch.setattr(beat.subprocess, "run", boom)
         # Must not propagate.
         beat._prune_permissions(tmp_path)

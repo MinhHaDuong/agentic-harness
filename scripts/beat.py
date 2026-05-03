@@ -847,8 +847,19 @@ def _prune_permissions(project: Path) -> None:
     Diff is written under ~/.claude/telemetry/permission-diffs/<date>.diff and
     surfaced by nightbeat-report. Diffs are NEVER auto-applied; failure here is
     benign and must not raise — beat must keep running.
+
+    The helper is invoked at most once per host per day. Without this guard,
+    every project × every beat (~85 invocations on a weekend day across 5
+    projects × 17 beats) would each spawn its own ``/fewer-permission-prompts``
+    session.
     """
     if not _is_prune_day():
+        return
+    today_diff = (
+        HARNESS_DIR / "telemetry" / "permission-diffs"
+        / f"{datetime.now().strftime('%Y-%m-%d')}.diff"
+    )
+    if today_diff.exists():
         return
     helper = HARNESS_DIR / "scripts" / "fewer-permission-prompts-helper.py"
     try:

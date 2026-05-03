@@ -29,7 +29,6 @@ This script must never crash the calling beat — see scripts/beat.py
 
 from __future__ import annotations
 
-import os
 import shutil
 import subprocess
 import sys
@@ -39,7 +38,7 @@ from pathlib import Path
 sys.tracebacklimit = 1
 
 
-HARNESS_DIR = Path(os.environ.get("HOME", str(Path.home()))) / ".claude"
+HARNESS_DIR = Path.home() / ".claude"
 DIFF_DIR = HARNESS_DIR / "telemetry" / "permission-diffs"
 
 # Cap on the spawned `claude` invocation. The wrapper above (`beat.py`)
@@ -102,10 +101,18 @@ def _spawn_claude(project: Path) -> tuple[int, str, str]:
         # fall through to the stdin fallback.
         if proc.returncode == 0:
             return proc.returncode, proc.stdout, proc.stderr
-        unknown_flag = (
-            "non-interactive" in (proc.stderr or "").lower()
-            or "unknown" in (proc.stderr or "").lower()
-            or "unrecognized" in (proc.stderr or "").lower()
+        stderr_lc = (proc.stderr or "").lower()
+        unknown_flag = any(
+            phrase in stderr_lc
+            for phrase in (
+                "non-interactive",
+                "unknown",
+                "unrecognized",
+                "unrecognised",
+                "no such option",
+                "invalid option",
+                "invalid argument",
+            )
         )
         if not unknown_flag:
             return proc.returncode, proc.stdout, proc.stderr
