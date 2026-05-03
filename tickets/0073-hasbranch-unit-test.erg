@@ -1,11 +1,12 @@
 %erg v1
 Title: Add unit test for hasBranch in erg binary
-Status: open
+Status: closed
 Created: 2026-05-02
 Author: claude
 
 --- log ---
 2026-05-02T20:25Z claude created
+2026-05-03T15:53Z claude status closed — tests already shipped in commit 20823c6 / PR #86; covers local match, local no-match, remote match, offline fallback
 
 --- body ---
 ## Context
