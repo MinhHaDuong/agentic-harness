@@ -11,5 +11,4 @@ Run one beat cycle on the current project and report the outcome.
 BEAT_PROJECT=$(git rev-parse --show-toplevel) python3 ~/.claude/scripts/beat.py
 ```
 
-When it finishes, read the last line of `beat-log.jsonl` in the current project
-and report: project, ticket_id, outcome, duration_s.
+Report the one-line summary printed to stdout by beat.py.

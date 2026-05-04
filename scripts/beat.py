@@ -856,7 +856,9 @@ def _prune_permissions(project: Path) -> None:
     if not _is_prune_day():
         return
     today_diff = (
-        HARNESS_DIR / "telemetry" / "permission-diffs"
+        HARNESS_DIR
+        / "telemetry"
+        / "permission-diffs"
         / f"{datetime.now().strftime('%Y-%m-%d')}.diff"
     )
     if today_diff.exists():
@@ -898,9 +900,7 @@ def _raid(project: ProjectConfig) -> tuple[str, str | None]:
     # was picked within the last 8h, skip pick-ticket entirely — the prior
     # raid hasn't had a chance to close it yet, and re-picking risks a
     # double-raid.
-    if any(
-        _ticket_recently_picked(t) for t in path.glob("tickets/*.erg")
-    ):
+    if any(_ticket_recently_picked(t) for t in path.glob("tickets/*.erg")):
         _log("=== pick-ticket: skipped (cooldown-recent-pick) ===")
         return "idle", None
 
@@ -1094,15 +1094,12 @@ def main() -> None:
         },
     )
 
-    if not DRY_RUN:
-        jq_last = subprocess.run(  # noqa: S603
-            ["jq", "-cs", "last"],
-            input=_beat_log_path(path).read_text(),
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-        _log(jq_last.stdout.strip())
+    ticket_label = ticket_id if ticket_id else "—"
+    minutes, seconds = divmod(elapsed, 60)
+    duration_str = f"{minutes}m {seconds}s" if minutes else f"{seconds}s"
+    print(
+        f"beat: {path.name} ticket={ticket_label} outcome={outcome} duration={duration_str}"
+    )
 
     _log(f"=== beat done elapsed={elapsed}s {_now_iso()} ===")
     if _state.log_fh is not None:
