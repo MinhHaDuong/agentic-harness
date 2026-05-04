@@ -3,10 +3,12 @@ Title: Mechanize bib-merge skill — extract deduplication to Python script
 Status: open
 Created: 2026-05-03
 Author: claude
+Closed: completed — bib-merge.py created, skill rewritten to 1 script call
 
 --- log ---
 2026-05-03T09:00Z claude created
 
+2026-05-04T21:14Z claude closed — completed — bib-merge.py created, skill rewritten to 1 script call
 --- body ---
 ## Context
 The bib-merge skill does bibtex deduplication: parse fence, match by
