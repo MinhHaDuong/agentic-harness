@@ -434,7 +434,7 @@ def main(argv: list[str]) -> int:
     report = merge(new_entries, refs_entries, refs_path, dry_run=dry_run)
     # Update source label in first report line
     report[0] = (
-        f"{'DRY-RUN: ' if dry_run else ''}bib-merge: {source_label} -> {refs_path}"
+        f"{'DRY-RUN: ' if dry_run else ''}bib-merge: {source_label} → {refs_path}"
     )
 
     for line in report:

@@ -1,12 +1,13 @@
 %erg v1
 Title: Move beat run-summary into beat.py — eliminate JSONL parsing from skill
-Status: open
 Created: 2026-05-03
 Author: claude
+Closed: completed — beat.py prints run summary; beat skill simplified
 
 --- log ---
 2026-05-03T09:00Z claude created
 
+2026-05-04T21:11Z claude closed — completed — beat.py prints run summary; beat skill simplified
 --- body ---
 ## Context
 The beat skill calls beat.py, then reads the last line of beat-log.jsonl

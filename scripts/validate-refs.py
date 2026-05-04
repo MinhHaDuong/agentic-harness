@@ -64,9 +64,13 @@ def _extract_bibliography_block(text: str) -> str:
 
 
 def _split_entries(bib_block: str) -> list[tuple[str, str]]:
-    """Split BibTeX block into list of (key, raw_entry) pairs."""
+    """Split BibTeX block into list of (key, raw_entry) pairs.
+
+    Limitation: closing } must appear at start of line. Entries whose
+    closing brace is inline (e.g. `  field = {v}} `) are silently skipped.
+    """
     entries = []
-    # Match @type{key, ... }
+    # Match @type{key, ... } where } is at start of line
     for m in re.finditer(
         r"@\w+\{([^,\s]+)\s*,([^@]*?)^\}", bib_block, re.MULTILINE | re.DOTALL
     ):
