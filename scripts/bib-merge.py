@@ -235,9 +235,6 @@ def _base_key(entry: dict) -> str:
 
 def _title_words(title: str) -> set[str]:
     """Lowercase word set for Jaccard similarity."""
-    title = re.sub(
-        r"\{[^}]*\}", lambda m: m.group(0).replace("{", "").replace("}", ""), title
-    )
     return set(re.findall(r"[a-z0-9]+", title.lower()))
 
 

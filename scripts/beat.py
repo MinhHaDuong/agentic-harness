@@ -1095,7 +1095,7 @@ def main() -> None:
     )
 
     ticket_label = ticket_id if ticket_id else "—"
-    minutes, seconds = divmod(elapsed, 60)
+    minutes, seconds = divmod(int(elapsed), 60)
     duration_str = f"{minutes}m {seconds}s" if minutes else f"{seconds}s"
     print(
         f"beat: {path.name} ticket={ticket_label} outcome={outcome} duration={duration_str}"

@@ -94,7 +94,16 @@ def _build_url(key: str, body: str) -> tuple[str | None, str]:
     """
     doi = _field(body, "doi")
     if doi:
-        doi = doi.strip().lstrip("https://doi.org/")
+        doi = doi.strip()
+        for prefix in (
+            "https://doi.org/",
+            "http://doi.org/",
+            "http://dx.doi.org/",
+            "doi:",
+        ):
+            if doi.lower().startswith(prefix):
+                doi = doi[len(prefix) :]
+                break
         return DOI_BASE + doi, "doi"
 
     eprint = _field(body, "eprint")
@@ -218,7 +227,6 @@ def main(argv: list[str]) -> int:
             print(f"[FAIL] {key}: {final_url} ({status})", file=sys.stderr)
             n_fail += 1
 
-    # Final verdict to stdout
     if n_fail > 0:
         print(f"FAIL: {n_fail} fetch failures — {note_path}")
         return 1
