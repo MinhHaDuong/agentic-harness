@@ -38,7 +38,7 @@ What problem or need this addresses. Why now.
 - Definition of done — when is this ticket complete?
 ```
 
-Create the ticket using whatever system the project has (git-erg `tickets/` directory preferred, forge issues as fallback). The agent knows how to use the available tools.
+Create the ticket using the `/ticket-new` skill (preferred — it delegates ID generation and validation to `erg`). Forge issues are a fallback for cross-repo coordination only. Never compute the next ticket ID manually — always use `erg next-id tickets/`.
 
 ## Tracking ticket convention
 

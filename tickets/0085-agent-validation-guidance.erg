@@ -1,0 +1,46 @@
+%erg v1
+Title: Update agent guidance for erg validate vs erg check — skills and hook
+Created: 2026-05-04
+Author: claude
+Closed: completed — validate call sites fixed; erg check in housekeeping (graceful fallback); full erg check enforcement deferred to git-erg/0038
+--- log ---
+2026-05-04T21:45Z claude created — follow-up to git-erg/0037 design; depends on binary split landing in git-erg/0038; unblock once that ships
+
+2026-05-04T21:11Z claude closed — completed — validate call sites fixed; erg check in housekeeping (graceful fallback); full erg check enforcement deferred to git-erg/0038
+--- body ---
+## Context
+
+git-erg/0037 redesigns validation into two commands:
+- `erg validate <files>` — per-file format + ref-existence, for pre-commit
+- `erg check [dir]` — full-corpus DAG + uniqueness + closure, for CI/housekeeping
+
+IDH skills and hooks currently call `erg validate` in ways that will need
+updating once git-erg/0038 ships the split.
+
+## Actions
+
+1. **`skills/ticket-new/SKILL.md`** — update the post-write validate step to
+   pass the new file explicitly:
+   ```bash
+   $ERG validate tickets/<new-file>.erg
+   ```
+   (Currently says `erg validate` rejects bad format — just make the call explicit.)
+
+2. **IDH pre-commit hook** (if installed) — verify it passes staged `.erg` files
+   to `erg validate`, not the whole tickets/ dir. Install/update from
+   `tickets/integration/hooks/pre-commit` once git-erg/0038 ships.
+
+3. **`skills/housekeeping/SKILL.md`** — add a step that runs `erg check tickets/`
+   to surface DAG coherence issues, duplicate IDs, and folder closure warnings.
+   Emit findings as beat-log warnings, not errors (exit 0 behaviour matches the
+   command).
+
+4. **`skills/raid/SKILL.md`** — verify the validate reference is still accurate
+   after the split; update if needed.
+
+## Exit criteria
+
+- `ticket-new` skill passes the new file explicitly to `erg validate`
+- `housekeeping` skill runs `erg check tickets/` and surfaces violations
+- IDH pre-commit hook (if present) uses staged-file form
+- All skill references to `erg validate` use the file-arg form

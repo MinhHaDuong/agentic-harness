@@ -1,12 +1,15 @@
 %erg v1
 Title: Mechanize related-work-note-validate — extract URL resolution to Python
-Status: open
 Created: 2026-05-03
 Author: claude
+Closed: completed — validate-refs.py created, skill rewritten to 1 script call
 
 --- log ---
 2026-05-03T09:00Z claude created
 
+2026-05-04T21:13Z claude closed — completed — validate-refs.py created, skill rewritten to 1 script call
+
+2026-05-04T22:00Z claude bump verify-reroll — round 1: lstrip in validate-refs.py:97 mangles dx.doi.org prefix; 3 verifiable: unresolved
 --- body ---
 ## Context
 The related-work-note-validate skill iterates bibliography entries, calls

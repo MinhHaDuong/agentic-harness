@@ -1,6 +1,5 @@
 %erg v1
 Title: Add cheap-worker delegation for I/O-heavy tasks (bulk reads, boilerplate)
-Status: open
 Created: 2026-05-03
 Author: haduong
 

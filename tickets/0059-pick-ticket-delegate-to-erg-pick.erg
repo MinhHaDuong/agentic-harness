@@ -1,13 +1,14 @@
 %erg v1
 Title: Simplify pick-ticket skill to delegate mechanical steps to erg pick
-Status: open
 Created: 2026-04-29
 Author: claude
+Closed: superseded by IDH/0066 — erg-pick triage cache approach replaced by beat-skip JSON (D4); branch-as-claim tracked in git-erg/0008
 
 --- log ---
 2026-04-29T11:20Z claude created
 2026-05-02T20:10Z haduong note superseded-by-0066: erg-pick approach replaced by beat-skip JSON; Blocked-by removed
 
+2026-05-04T20:26Z claude closed — superseded by IDH/0066 — erg-pick triage cache approach replaced by beat-skip JSON (D4); branch-as-claim tracked in git-erg/0008
 --- body ---
 ## Context
 

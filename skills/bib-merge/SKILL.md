@@ -14,24 +14,16 @@ flag conflicts, append new ones, report everything.
 
 ## Constraints (non-obvious)
 
-- **Append-only.** Use `Edit` anchored to the last entry to append.
-  Never rewrite, reorder, or reformat existing entries. If refs.bib
-  is empty, use `Write` for the first entry.
-- **Never create refs.bib.** If it doesn't exist, abort. That's a
-  project-setup decision.
+- **Append-only.** The script appends entries; never rewrites or
+  reorders existing entries. If refs.bib doesn't exist, script
+  aborts with exit 1 — that's a project-setup decision.
 - **Never mutate existing entries.** If the note has a field the
-  existing entry lacks (e.g., a DOI), report it as a suggestion.
-  Don't write it.
-- **Dedupe on author+year, confirm with DOI or title.** If DOIs
-  match → same work. If DOIs differ → same work, metadata conflict
-  (report both, don't append). If no DOI on either side → judge by
-  title similarity. Different titles → different work, suffix-bump
-  the key.
+  existing entry lacks, report it as a suggestion. Don't write it.
+- **Dedupe on author+year, confirm with DOI or title.**
+  Matching DOI → SKIPPED. Differing DOI → different work, suffix-bump
+  the key (RENAMED). No DOI → judge by title similarity (Jaccard ≥ 0.8).
 - **Report suffix-bumps.** Every renamed key must be reported so
   the author can update `\cite{}` calls.
-- **Match the library's formatting style** (indentation, field
-  order, key-equals spacing) for new entries. Don't mint keys in a
-  style the library doesn't use — flag the mismatch instead.
 - **Note file is read-only.** Never modify it.
 - **`--dry-run`** runs the full logic, prefixes report with
   `DRY-RUN:`, does not write.
@@ -43,18 +35,44 @@ flag conflicts, append new ones, report everything.
 ## Input
 
 1. Note file path (required) — must have `## Bibliography` with a
-   ```bibtex fence.
+   ```bibtex fence. The script auto-extracts the fence.
 2. refs.bib path (optional) — default `report/refs.bib` if it exists.
 3. `--dry-run` flag (optional).
 
-## Report format
+## Steps
+
+**Step 1 — resolve refs.bib path (if not provided)**
+
+If the user did not provide a refs.bib path, check whether
+`report/refs.bib` exists in the current project. If it does, use it.
+If neither exists, abort with: `ERROR: no refs.bib found`.
+
+**Step 2 — run the deduplication script (one Bash call)**
+
+```
+python3 ~/.claude/scripts/bib-merge.py <note-file> <refs.bib> [--dry-run]
+```
+
+The script:
+- Extracts the ```bibtex fence from the note file automatically
+- Parses all entries from both the fence and refs.bib
+- Deduplicates (author+year primary key; DOI or title confirmation)
+- Appends non-duplicate entries to refs.bib (unless --dry-run)
+- Prints a report to stdout
+
+**Step 3 — relay the report**
+
+Print the script's stdout verbatim as the skill output.
+
+## Report format (from script)
 
 ```
 bib-merge: {note-file} → {refs.bib}
-  merged:      N entries appended
-  deduped:     K (list: note-key → existing-key)
-  renamed:     R (list: old-key → new-key)
-  conflicts:   C (list: key — field: note-value vs bib-value)
-  suggestions: F field-adds (list: key — field: value)
-  skipped:     S malformed (list: key — reason)
+  added:    N
+  skipped:  K  (duplicates)
+  renamed:  R  (key collisions)
+  errors:   E  (malformed entries)
+[ADDED] @key
+[SKIPPED] @key  (duplicate of @existingkey)
+[RENAMED->newkey] @oldkey
 ```

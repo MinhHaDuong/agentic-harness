@@ -1,8 +1,8 @@
 %erg v1
 Title: Adapt to git-erg 0013 — drop .wip readers and claim/release delegation
-Status: closed
 Created: 2026-05-01
 Author: claude
+Closed: migrated from Status: closed
 
 --- log ---
 2026-05-01T17:30Z claude created — companion to git-erg PR #10 (ticket 0013)

@@ -23,6 +23,16 @@ Run full repo housekeeping and act on every finding.
     Report these as candidates for cleanup but do not auto-delete — list them
     in the housekeeping summary for human review.
 
+1c. **DAG coherence check.** Run `erg check` if available (command tracked in
+    git-erg/0038) to surface duplicate IDs, dangling Blocked-by refs, and
+    folder-closure issues. Degrade gracefully if the command is not yet
+    installed:
+    ```bash
+    ERG=${ERG:-tickets/tools/go/erg}
+    $ERG check tickets/ 2>/dev/null || true
+    ```
+    Emit any output as housekeeping warnings; do not abort on non-zero exit.
+
 2. **Healthcheck.** Invoke /healthcheck. Parse the Action plan.
 
 3. **Fix `fix-now` items.** Apply every `fix-now` item inline. If any fixes were

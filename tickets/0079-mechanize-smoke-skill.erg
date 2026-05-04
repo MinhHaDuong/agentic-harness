@@ -1,12 +1,13 @@
 %erg v1
 Title: Mechanize smoke skill — extract shell steps to bash script
-Status: open
 Created: 2026-05-03
 Author: claude
+Closed: completed — smoke.sh created, skill rewritten to 1 Bash call
 
 --- log ---
 2026-05-03T09:00Z claude created
 
+2026-05-04T21:11Z claude closed — completed — smoke.sh created, skill rewritten to 1 Bash call
 --- body ---
 ## Context
 The smoke skill runs 7 shell commands (date, whoami, pwd, printenv, etc.)

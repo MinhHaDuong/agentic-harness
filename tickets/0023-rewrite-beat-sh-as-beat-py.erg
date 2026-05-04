@@ -1,8 +1,8 @@
 %erg v1
 Title: Rewrite beat.sh as beat.py — hardcode the orchestration loop in Python
-Status: closed
 Created: 2026-04-25
 Author: claude
+Closed: completed — beat.py implemented and in production
 
 --- log ---
 2026-04-25T15:10Z claude created
@@ -10,6 +10,7 @@ Author: claude
 2026-04-25T15:20Z claude status doing
 2026-04-25T17:30Z claude status closed — beat.py written (50 tests, ruff clean), beat.sh+SKILL.md deleted, systemd unit updated and reloaded
 
+2026-05-04T20:59Z claude closed — completed — beat.py implemented and in production
 --- body ---
 ## Context
 

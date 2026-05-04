@@ -114,10 +114,15 @@ individual `/verify` verdicts.
 
 Check each merge request for scope creep — did Execute exceed the Plan?
 
+**Token economy rule**: Any time a ticket must be created in any phase, invoke
+`/ticket-new` — never write the file directly or compute the next ID manually.
+`/ticket-new` calls `erg next-id` and `erg validate <file>` (file arg, not
+directory), keeping mechanical work inside the tool where it belongs.
+
 For each out-of-scope finding, choose one outcome:
 
 - **CLEAN** — no scope creep found; continue.
-- **TICKETED** — create a new ticket via `/new-ticket` for the out-of-scope work.
+- **TICKETED** — create a new ticket via `/ticket-new` for the out-of-scope work.
   Leave commits in the PR. Add a line to the PR body: `Scope overflow: #NNNN`.
   Do not rewrite git history.
 - **ESCALATE** — scope creep is present but cannot be cleanly ticketed (ambiguous

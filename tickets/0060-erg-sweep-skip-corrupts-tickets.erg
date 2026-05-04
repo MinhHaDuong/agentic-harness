@@ -1,8 +1,8 @@
 %erg v1
 Title: erg sweep-skip corrupts ticket bodies via slice aliasing
-Status: closed
 Created: 2026-04-29
 Author: claude
+Closed: superseded by IDH/0066 D4 — sweep cache and sweep-skip removed entirely
 
 --- log ---
 2026-04-29T15:55Z claude created
@@ -10,6 +10,7 @@ Author: claude
 2026-04-29T18:54Z claude status doing starting-implementation
 2026-04-29T19:05Z claude status closed all-exit-criteria-met
 
+2026-05-04T20:59Z claude closed — superseded by IDH/0066 D4 — sweep cache and sweep-skip removed entirely
 --- body ---
 ## Context
 
