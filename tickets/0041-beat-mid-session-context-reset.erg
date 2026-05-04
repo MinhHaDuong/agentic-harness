@@ -7,6 +7,7 @@ Author: claude
 2026-04-27T12:30Z claude created
 
 2026-04-27T21:04Z claude note sweep-assess: not-picked hash:984bdefc447d scope:read beat.py and logs, potentially close as no-op risk:low
+2026-05-05T10:00Z claude closed — beat.py is pure Python orchestration; each sub-skill is a fresh subprocess with --no-session-persistence + --print, so no session accumulates context. H2 (sub-session bloat) is bounded by existing budget caps ($0.75) and timeouts (8–10 min). Solution candidates A/B unnecessary; closes as no-op per acceptance criteria.
 --- body ---
 ## Problem
 
