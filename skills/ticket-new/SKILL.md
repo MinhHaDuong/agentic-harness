@@ -50,9 +50,9 @@ from a conversation. Extract the intent and normalize to `%erg v1`.
    ```
    Note: no `Status:` header — `erg validate` rejects it.
 
-4. Validate the new ticket:
+4. Validate the new ticket (pass the specific file, not the directory):
    ```bash
-   $ERG validate tickets/
+   $ERG validate tickets/<new-file>.erg
    ```
    Fix any errors before committing.
 

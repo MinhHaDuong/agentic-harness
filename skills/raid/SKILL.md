@@ -116,8 +116,8 @@ Check each merge request for scope creep — did Execute exceed the Plan?
 
 **Token economy rule**: Any time a ticket must be created in any phase, invoke
 `/ticket-new` — never write the file directly or compute the next ID manually.
-`/ticket-new` calls `erg next-id` and `erg validate`, keeping mechanical work
-inside the tool where it belongs.
+`/ticket-new` calls `erg next-id` and `erg validate <file>` (file arg, not
+directory), keeping mechanical work inside the tool where it belongs.
 
 For each out-of-scope finding, choose one outcome:
 
