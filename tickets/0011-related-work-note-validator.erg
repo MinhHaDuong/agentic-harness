@@ -9,6 +9,7 @@ Closed: migrated from Status: closed
 2026-04-17T12:27Z claude claimed
 2026-04-17T12:27Z claude note drafted skills/related-work-note-validate/SKILL.md
 2026-04-17T12:27Z claude status closed exit criteria met
+2026-05-04T22:00Z claude note upgraded by 0082 — LLM WebFetch loop replaced by validate-refs.py (scripts/validate-refs.py); skill now makes 1 Bash call
 
 --- body ---
 ## Context

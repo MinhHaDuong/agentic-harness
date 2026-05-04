@@ -9,6 +9,7 @@ Closed: migrated from Status: closed
 2026-04-17T12:45Z claude claimed
 2026-04-17T12:45Z claude note drafted skills/bib-merge/SKILL.md
 2026-04-17T12:45Z claude status closed exit criteria met
+2026-05-04T22:00Z claude note upgraded by 0081 — LLM string-manipulation replaced by bib-merge.py (scripts/bib-merge.py); skill now makes 1 Bash call
 
 --- body ---
 ## Context
