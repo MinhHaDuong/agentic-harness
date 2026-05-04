@@ -1,6 +1,5 @@
 %erg v1
 Title: Split housekeeping into git-cleanup phase and ticket-scan phase
-Status: open
 Created: 2026-04-27
 Author: claude
 

@@ -1,6 +1,5 @@
 %erg v1
 Title: Mechanize bib-merge skill — extract deduplication to Python script
-Status: open
 Created: 2026-05-03
 Author: claude
 Closed: completed — bib-merge.py created, skill rewritten to 1 script call

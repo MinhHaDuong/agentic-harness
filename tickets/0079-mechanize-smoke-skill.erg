@@ -1,6 +1,5 @@
 %erg v1
 Title: Mechanize smoke skill — extract shell steps to bash script
-Status: open
 Created: 2026-05-03
 Author: claude
 Closed: completed — smoke.sh created, skill rewritten to 1 Bash call

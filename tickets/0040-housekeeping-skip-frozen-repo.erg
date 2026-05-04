@@ -1,8 +1,8 @@
 %erg v1
 Title: Skip housekeeping when repo is frozen (no commits, no ticket changes)
-Status: closed
 Created: 2026-04-27
 Author: claude
+Closed: migrated from Status: closed
 
 --- log ---
 2026-04-27T12:30Z claude created

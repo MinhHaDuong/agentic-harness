@@ -1,14 +1,15 @@
 %erg v1
 Title: Redesign ticket state model: formal machine, coherence rules, and enforced invariants
-Status: closed
 Created: 2026-04-30
 Author: claude
+Closed: completed — D1-D5 implemented: branch-as-claim, open/closed only, beat-skip JSON, sweep cache removed
 
 --- log ---
 2026-04-30T07:45Z claude created
 2026-04-30T07:50Z claude note scope expanded: design review → full redesign + implementation; .erg format changes in scope
 2026-05-02T20:15Z haduong status closed — D1-D5 implemented: branch-as-claim, {open,closed} only, beat-skip JSON, sweep cache removed
 
+2026-05-04T20:59Z claude closed — completed — D1-D5 implemented: branch-as-claim, open/closed only, beat-skip JSON, sweep cache removed
 --- body ---
 ## Context
 

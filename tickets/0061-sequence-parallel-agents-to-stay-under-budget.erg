@@ -1,6 +1,5 @@
 %erg v1
 Title: Sequence parallel agents rather than fan out when ticket risks budget ceiling
-Status: open
 Created: 2026-04-30
 Author: claude
 

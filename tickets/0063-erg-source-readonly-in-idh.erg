@@ -1,6 +1,5 @@
 %erg v1
 Title: Enforce erg source read-only in IDH; edits must go to git-erg project
-Status: open
 Created: 2026-04-30
 Author: claude
 

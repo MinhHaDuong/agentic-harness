@@ -1,6 +1,5 @@
 %erg v1
 Title: Route .erg ticket mutations through erg binary instead of direct file edits
-Status: open
 Created: 2026-04-29
 Author: claude
 

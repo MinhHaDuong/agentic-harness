@@ -1,14 +1,15 @@
 %erg v1
 Title: Remove git fsck --unreachable from housekeeping healthcheck
-Status: closed
 Created: 2026-04-27
 Author: claude
+Closed: completed — git fsck removed from housekeeping
 
 --- log ---
 2026-04-27T00:00Z claude created
 2026-04-27T12:00Z claude doing orchestrator
 2026-04-27T11:04Z claude status closed — merged in eb3031d (git fsck check removed from healthcheck)
 
+2026-05-04T20:59Z claude closed — completed — git fsck removed from housekeeping
 --- body ---
 ## Problem
 
