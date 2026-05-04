@@ -1,6 +1,6 @@
 # Imperial Dragon Harness — State
 
-Last updated: 2026-05-03T15:00Z
+Last updated: 2026-05-04T23:00Z
 
 ## North star
 
@@ -12,32 +12,33 @@ Level 4 (Hooks) + raid + `/verify` loop + git-erg tickets + bibliography pipelin
 
 **Forge-agnostic**: leak-guard enforces no `gh`/`github.com` in skills.
 
-**Nightbeat** (`claude-nightbeat.timer`) live on padme. Fires every 30 min 22:00–06:00 weeknights, every 30 min all day weekends (17 runs/night). `beat.py` controls flow in Python — no LLM orchestrator. Per-project lock allows concurrent beats. `project_scoped=True` prevents cross-project ticket leakage.
+**Nightbeat** (`claude-nightbeat.timer`) live on padme. Fires every 30 min 22:00–06:00 weeknights, every 30 min all day weekends (17 runs/night). `beat.py` controls flow in Python — no LLM orchestrator. Per-project lock allows concurrent beats. `project_scoped=True` prevents cross-project ticket leakage. Beat prints one-line run summary to stdout (project, ticket, outcome, duration).
 
-**Per-project budgets**: `ProjectConfig` dataclass in `beat.py` — all projects at $0.40/$0.50. 5 targets in `scripts/projects.json` (aedist-technical-report, chemin-de-voix, git-erg, Climate_finance, fuzzy-corpus). Ticket 0069 open to move config into per-project `.claude/beat.json`.
+**Per-project budgets**: `ProjectConfig` dataclass in `beat.py` — all projects at $0.40/$0.50. 2 targets in `scripts/projects.json`: `aedist-technical-report`, `~/.claude`. Ticket 0069 open to move config into per-project `.claude/beat.json`.
 
 **Idle skip**: housekeeping skipped when repo has no commits since last run (ticket 0036 closed).
 
-**erg sweep cache**: `erg ready --json` returns `cache`/`hash` per ticket. `erg sweep-skip` and `erg sweep-write` compute hash server-side. Pick-ticket reads ticket bodies only on cache:miss. 96 pytest + 27 Go tests, all green. Skills resolve erg binary as `${ERG:-erg}` for PATH portability.
+**Token economy** (PR #97, 2026-05-04): deterministic skill steps extracted to scripts — `scripts/smoke.sh`, `scripts/bib-merge.py`, `scripts/validate-refs.py`. Skills now make 1 Bash call for mechanical work; LLM handles only non-deterministic steps. `erg validate <files>` (not directory) used at all call sites; `erg check tickets/` added to housekeeping with graceful fallback pending git-erg/0038.
 
-**git-erg**: pre-commit hooks installed in all projects. CI live (ticket 0009, PR #4 merged).
+**git-erg**: pre-commit hooks installed in all projects. CI live (ticket 0009, PR #4 merged). Validation split: `erg validate <files>` (per-file) vs `erg check [dir]` (corpus) defined in spec; binary implementation tracked by git-erg/0038.
 
 **Worktree lifecycle**: worktrees created via `Agent(isolation:"worktree")` are harness-managed. Skills must not rm them manually. Raid wrap-up step "Clean up worktrees" removed (2026-04-30).
 
 ## Open tickets
 
 - 0013 — bib-to-zotero (push refs.bib to Zotero via API at submission)
+- 0017 — bump verb instrumentation in erg validator + skills
+- 0026 — clarify Phase 7 scope-creep handling
+- 0027 — pick-ticket incremental assessment cache
 - 0028 — multiproject beat dashboard (Views 1-2)
 - 0029 — beat dashboard blocker graph (blocked by 0028)
+- 0031 — housekeeping: replace grep-based scan with `erg ready --json`
 - 0034 — housekeeping: split git-cleanup and ticket-scan into two phases
 - 0041 — investigate mid-session context reset between sub-skills
 - 0044 — interactive session observer
 - 0047 — auto early context compaction in beat and raid
-- 0049 — truth in ticket open status
 - 0051 — beat should try another project when current one is idle or frozen
-- 0052 — beat erg edit permission denied
-- 0057 — route .erg mutations through erg binary (blocked by erg binary exposing mutation commands)
-- 0059 — simplify pick-ticket to delegate to `erg pick`
+- 0057 — route .erg mutations through erg binary (blocked: needs git-erg/0039 `erg log` + git-erg/0040 `erg new`)
 - 0061 — sequence parallel agents to stay under budget (corpus discovery fanout crash)
 - 0062 — run nightbeat from a VM (uptime + bypass Gallica 403 blocks)
 - 0063 — enforce erg source read-only in IDH; edits go to git-erg
@@ -47,23 +48,20 @@ Level 4 (Hooks) + raid + `/verify` loop + git-erg tickets + bibliography pipelin
 - 0068 — two-word canonical names + IDH aliases for all skills
 - 0069 — per-project beat config (.claude/beat.json) with interval_minutes
 - 0070 — /dream skill — autonomous nightly memory consolidation
-- 0079 — mechanize smoke skill — extract shell steps to bash script
-- 0080 — move beat run-summary into beat.py (eliminate JSONL parsing from skill)
-- 0081 — mechanize bib-merge — extract deduplication to Python script
-- 0082 — mechanize related-work-note-validate — extract URL resolution to Python
-- 0083 — mechanize ticket-ready — thin wrapper over `erg ready`
+- 0084 — cheap-worker delegation (blocked: needs WORKER_API_KEY + openai library)
 - 0054 — [discussion] restore Five-Claws phase announcement at session start
 - 0055 — [discussion] milestone/epic layer above tickets
 - 0056 — [discussion] mid-session pause/resume checkpoints
 
 ## Blockers
 
-None
+- **0057**: needs git-erg/0039 (`erg log`) + git-erg/0040 (`erg new`) in binary
+- **0084**: needs WORKER_API_KEY secret + openai library on host
 
 ## Next actions
 
 - **doudou setup**: add source line to `~/.bashrc`, install nightbeat systemd units, copy erg binary to all projects
-- **Rate limit watch**: 7-day utilization at 86% as of 2026-05-02; resets 2026-05-04 21:00 CEST — monitor for stalled beat runs this weekend
+- **git-erg/0008**: rewrite branch-as-claim check in `erg ready` — pending from git-erg session (IDH hook reverted IDH-side edits twice)
 
 ## Backlog
 
