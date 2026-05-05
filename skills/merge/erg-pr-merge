@@ -43,8 +43,8 @@ if [[ "$CURRENT_BRANCH" != "$PR_BRANCH" ]]; then
 fi
 
 MERGEABLE=$(echo "$PR_JSON" | jq -r '.mergeable')
-if [[ "$MERGEABLE" == "CONFLICTING" ]]; then
-    die "PR has merge conflicts — resolve before merging"
+if [[ "$MERGEABLE" != "MERGEABLE" ]]; then
+    die "mergeability is ${MERGEABLE} — resolve conflicts or try again in a moment"
 fi
 
 FAILING=$(echo "$PR_JSON" | jq -r '
@@ -68,16 +68,17 @@ TICKET_ID=$(echo "$BODY" | grep -oP '(?<=\*\*Ticket:\*\* )tickets/\K\d+' | head 
 
 # ── Step 2: close ticket (only if erg project and ticket found) ───────────────
 
-if [[ -n "$TICKET_ID" ]] && [[ -d tickets ]] && command -v erg &>/dev/null; then
+ERG=${ERG:-erg}
+if [[ -n "$TICKET_ID" ]] && [[ -d tickets ]] && command -v "$ERG" &>/dev/null; then
     echo "Closing ticket ${TICKET_ID}..."
-    erg close "$TICKET_ID" "autoclosed — PR #${PR}"
+    "$ERG" close "$TICKET_ID" "autoclosed — PR #${PR}"
     TICKET_GLOB="tickets/${TICKET_ID}-"*.erg
     # shellcheck disable=SC2086
     git add $TICKET_GLOB tickets/closed/ 2>/dev/null || true
     if ! git diff --cached --quiet; then
         git commit -m "ticket(${TICKET_ID}): close — PR #${PR}"
     fi
-    git push
+    git push origin HEAD
 elif [[ -n "$TICKET_ID" ]]; then
     echo "Note: ticket ${TICKET_ID} found but no erg available — skipping close"
 else
