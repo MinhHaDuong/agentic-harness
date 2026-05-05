@@ -17,13 +17,7 @@ Run full repo housekeeping and act on every finding.
     `until` is present and `until < now`. Rewrite the file in place. This
     prevents the skip list from accumulating expired entries across beats.
 
-1b. **Stale-branch check.** List local branches whose name contains a 4-digit
-    ticket ID (`git branch --list`). For each, check if the ticket is already
-    `closed` and the branch has no commits beyond `main` in the last 24 h.
-    Report these as candidates for cleanup but do not auto-delete — list them
-    in the housekeeping summary for human review.
-
-1c. **DAG coherence check.** Run `erg check` if available (command tracked in
+1b. **DAG coherence check.** Run `erg check` if available (command tracked in
     git-erg/0038) to surface duplicate IDs, dangling Blocked-by refs, and
     folder-closure issues. Degrade gracefully if the command is not yet
     installed:
@@ -33,7 +27,11 @@ Run full repo housekeeping and act on every finding.
     ```
     Emit any output as housekeeping warnings; do not abort on non-zero exit.
 
-2. **Healthcheck.** Invoke /healthcheck. Parse the Action plan.
+2. **Healthcheck.** Invoke /healthcheck. The probe (`project-state.py`)
+   runs once inside healthcheck and covers all checks — do not re-run git
+   commands already collected there. Parse the **Action plan** section from
+   the output: the bold headings `**fix-now**`, `**open-ticket**`, `**skip**`
+   are the contract interface consumed by steps 3–5 below.
 
 3. **Fix `fix-now` items.** Apply every `fix-now` item inline. If any fixes were
    applied, commit once: `chore: housekeeping fixes (sweep)`.
@@ -55,10 +53,11 @@ Run full repo housekeeping and act on every finding.
 
 When `BEAT_HOUSEKEEPING_BRANCH` is set in the environment, you are running
 under `beat.py` on a dedicated `claude/housekeeping-*` branch already cut
-from `origin/main`. Behaviour stays the same — commit fix-now items and the
-timestamp as usual. `beat.py` handles push, PR creation, CI verification,
-and squash-merge once you exit; do NOT push or open a PR yourself. The
-no-push guard is relaxed for that branch only.
+from the remote default branch. Behaviour stays the same — commit fix-now
+items and the timestamp as usual. Do NOT push or open a PR yourself.
+`beat.py` checks for commits after you exit: if there are none it deletes
+the branch; if there are commits it leaves the branch locally as a
+"deferred" candidate for human review.
 
 If `BEAT_HOUSEKEEPING_BRANCH` is unset (interactive `/housekeeping`), commit
 in place as before — no PR detour for hand-typed runs.

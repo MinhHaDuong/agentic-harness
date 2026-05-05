@@ -6,6 +6,7 @@ import shutil
 import subprocess
 import sys
 import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 THRESHOLD_HOURS = 12.0
@@ -15,12 +16,22 @@ def run(args, cwd):
     return subprocess.run(args, capture_output=True, text=True, check=False, cwd=cwd)
 
 
+def _default_branch(project):
+    r = run(["git", "symbolic-ref", "--short", "refs/remotes/origin/HEAD"], project)
+    return r.stdout.strip().removeprefix("origin/") if r.returncode == 0 else "main"
+
+
 def git_state(project):
     branch_r = run(["git", "rev-parse", "--abbrev-ref", "HEAD"], project)
     branch = branch_r.stdout.strip() if branch_r.returncode == 0 else None
 
     porcelain = run(["git", "status", "--porcelain"], project)
     clean = porcelain.returncode == 0 and porcelain.stdout.strip() == ""
+    dirty_files = (
+        [line.strip() for line in porcelain.stdout.splitlines() if line.strip()]
+        if not clean
+        else []
+    )
 
     lr = run(["git", "rev-list", "--left-right", "--count", "HEAD...@{u}"], project)
     ahead, behind = 0, 0
@@ -29,7 +40,32 @@ def git_state(project):
         if len(parts) == 2:
             ahead, behind = int(parts[0]), int(parts[1])
 
-    return {"branch": branch, "clean": clean, "ahead": ahead, "behind": behind}
+    log_r = run(
+        ["git", "log", "--since=12 hours ago", "--format=%H\t%ct\t%s"],
+        project,
+    )
+    now = time.time()
+    recent_commits = []
+    for line in log_r.stdout.splitlines():
+        parts = line.split("\t", 2)
+        if len(parts) == 3:
+            h, ct, subject = parts
+            try:
+                age_minutes = int((now - int(ct)) / 60)
+            except ValueError:
+                age_minutes = -1
+            recent_commits.append(
+                {"hash": h[:8], "subject": subject, "age_minutes": age_minutes}
+            )
+
+    return {
+        "branch": branch,
+        "clean": clean,
+        "dirty_files": dirty_files,
+        "ahead": ahead,
+        "behind": behind,
+        "recent_commits": recent_commits,
+    }
 
 
 def housekeeping_state(project):
@@ -114,6 +150,70 @@ def ticket_state(project):
     return {"ready": len(ready_ids), "open": open_count, "ready_ids": ready_ids}
 
 
+def branch_state(project):
+    default = _default_branch(project)
+
+    local_r = run(["git", "branch", "--format=%(refname:short)"], project)
+    remote_r = run(["git", "branch", "-r", "--format=%(refname:short)"], project)
+
+    local = [b.strip() for b in local_r.stdout.splitlines() if b.strip()]
+    remote = [b.strip() for b in remote_r.stdout.splitlines() if b.strip()]
+    non_default = [b for b in local if b != default]
+
+    def _count(branch):
+        r = run(["git", "rev-list", "--count", f"{default}..{branch}"], project)
+        try:
+            return int(r.stdout.strip())
+        except ValueError:
+            return 0
+
+    if non_default:
+        with ThreadPoolExecutor(max_workers=min(8, len(non_default))) as pool:
+            counts = list(pool.map(_count, non_default))
+    else:
+        counts = []
+
+    details = [
+        {"name": b, "commits_beyond_default": c} for b, c in zip(non_default, counts)
+    ]
+
+    return {"local": local, "remote": remote, "details": details}
+
+
+def worktree_state(project):
+    r = run(["git", "worktree", "list", "--porcelain"], project)
+    if r.returncode != 0:
+        return []
+
+    worktrees: list[dict] = []
+    current: dict = {}
+    for line in r.stdout.splitlines():
+        if not line:
+            if current:
+                worktrees.append(current)
+                current = {}
+        elif line.startswith("worktree "):
+            current["path"] = line[9:]
+        elif line.startswith("HEAD "):
+            current["head"] = line[5:][:8]
+        elif line.startswith("branch "):
+            current["branch"] = line[7:].removeprefix("refs/heads/")
+        elif line == "locked":
+            current["locked"] = True
+            current["lock_reason"] = ""
+        elif line.startswith("locked "):
+            current["locked"] = True
+            current["lock_reason"] = line[7:]
+        elif line == "detached":
+            current["branch"] = None
+        elif line == "bare":
+            current["bare"] = True
+    if current:
+        worktrees.append(current)
+
+    return worktrees
+
+
 def test_state(project):
     makefile = project / "Makefile"
     if makefile.exists():
@@ -189,24 +289,30 @@ def pr_state(project):
 
 def main():
     if len(sys.argv) < 2:
-        print(json.dumps({"error": "usage: project-state.py <project-path> [--full]"}))
+        print(json.dumps({"error": "usage: project-state.py <project-path>"}))
         sys.exit(0)
 
     project = Path(sys.argv[1]).expanduser().resolve()
-    full = "--full" in sys.argv
 
     out = {"path": str(project)}
 
-    try:
-        out["git"] = git_state(project)
-        out["housekeeping"] = housekeeping_state(project)
-        out["tickets"] = ticket_state(project)
+    collectors: dict = {
+        "git": git_state,
+        "housekeeping": housekeeping_state,
+        "tickets": ticket_state,
+        "branches": branch_state,
+        "worktrees": worktree_state,
+        "tests": test_state,
+        "prs": pr_state,
+    }
 
-        if full:
-            out["tests"] = test_state(project)
-            out["prs"] = pr_state(project)
-    except Exception as e:
-        out["error"] = repr(e)
+    with ThreadPoolExecutor(max_workers=len(collectors)) as pool:
+        futures = {key: pool.submit(fn, project) for key, fn in collectors.items()}
+        for key, future in futures.items():
+            try:
+                out[key] = future.result()
+            except Exception as e:
+                out[key] = {"error": repr(e)}
 
     print(json.dumps(out, indent=2))
 

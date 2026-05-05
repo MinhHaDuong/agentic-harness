@@ -573,6 +573,22 @@ def run_skill(
 # ── Origin sync ───────────────────────────────────────────────────────────────
 
 
+def _default_branch(project: Path) -> str:
+    """Return the remote default branch name, falling back to 'main'."""
+    result = subprocess.run(  # noqa: S603
+        ["git", "symbolic-ref", "--short", "refs/remotes/origin/HEAD"],
+        capture_output=True,
+        text=True,
+        check=False,
+        cwd=project,
+    )
+    return (
+        result.stdout.strip().removeprefix("origin/")
+        if result.returncode == 0
+        else "main"
+    )
+
+
 def _sync_origin_main(project: Path) -> None:
     """Update the local default branch from origin.
 
@@ -580,19 +596,7 @@ def _sync_origin_main(project: Path) -> None:
     pick-ticket see current ticket state from merged PRs.  All failures
     are non-fatal — the beat continues regardless.
     """
-    # Detect remote default branch; fall back to "main".
-    head_ref = subprocess.run(  # noqa: S603
-        ["git", "symbolic-ref", "--short", "refs/remotes/origin/HEAD"],
-        capture_output=True,
-        text=True,
-        check=False,
-        cwd=project,
-    )
-    default_branch = (
-        head_ref.stdout.strip().removeprefix("origin/")
-        if head_ref.returncode == 0
-        else "main"
-    )
+    default_branch = _default_branch(project)
 
     # Fetch only the default branch; skip on network or auth failure.
     fetch = subprocess.run(  # noqa: S603
@@ -715,9 +719,10 @@ def _housekeeping_phase(project: ProjectConfig) -> str:
         _log(f"=== housekeeping: skipped {_now_iso()} ===")
         return "skipped"
 
-    base = _git("rev-parse", "origin/main", cwd=path).stdout.strip()
+    default_branch = _default_branch(path)
+    base = _git("rev-parse", f"origin/{default_branch}", cwd=path).stdout.strip()
     if not base:
-        _log("=== housekeeping: cannot resolve origin/main ===")
+        _log(f"=== housekeeping: cannot resolve origin/{default_branch} ===")
         return "failed"
 
     nonce = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ") + "-" + secrets.token_hex(2)
@@ -748,7 +753,7 @@ def _housekeeping_phase(project: ProjectConfig) -> str:
         return "failed"
 
     n = _git("rev-list", "--count", f"{base}..HEAD", cwd=path).stdout.strip() or "0"
-    _git("checkout", "main", cwd=path)
+    _git("checkout", default_branch, cwd=path)
     if int(n) == 0:
         _log("=== housekeeping: no commits, deleting branch ===")
         _git("branch", "-D", branch, cwd=path)
