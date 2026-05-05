@@ -2,11 +2,13 @@
 Title: Force context reset between housekeeping and pick-ticket sub-sessions
 Created: 2026-04-27
 Author: claude
+Closed: beat.py spawns fresh claude CLI processes with --no-session-persistence; no context accumulates between sub-tasks. Hypothesis C (no-op) confirmed.
 
 --- log ---
 2026-04-27T12:30Z claude created
 
 2026-04-27T21:04Z claude note sweep-assess: not-picked hash:984bdefc447d scope:read beat.py and logs, potentially close as no-op risk:low
+2026-05-05T04:07Z claude closed — beat.py spawns fresh claude CLI processes with --no-session-persistence; no context accumulates between sub-tasks. Hypothesis C (no-op) confirmed.
 --- body ---
 ## Problem
 
