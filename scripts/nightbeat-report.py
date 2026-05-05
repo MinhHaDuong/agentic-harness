@@ -21,6 +21,7 @@ HARNESS_DIR = Path.home() / ".claude"
 LOGDIR = HARNESS_DIR / "logs" / "nightbeat"
 PERMISSION_DIFFS_DIR = HARNESS_DIR / "telemetry" / "permission-diffs"
 PROJECTS_CONFIG = HARNESS_DIR / "scripts" / "projects.json"
+OUTCOMES_LOG = HARNESS_DIR / "logs" / "beat-outcomes.jsonl"
 
 
 def _load_rotation_projects() -> list[Path]:
@@ -304,6 +305,32 @@ def _unreviewed_permission_diffs(since: datetime) -> list[tuple[Path, int]]:
     return out
 
 
+# ── 7-day phase outcomes ───────────────────────────────────────────────────────
+
+
+def _outcomes_7day_summary() -> dict[str, dict[str, dict[str, int]]]:
+    """Read OUTCOMES_LOG; return project → phase → outcome → count for last 7 days."""
+    if not OUTCOMES_LOG.exists():
+        return {}
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=7)).strftime("%Y-%m-%dT")
+    summary: dict[str, dict[str, dict[str, int]]] = {}
+    for raw in OUTCOMES_LOG.read_text().splitlines():
+        if not raw.strip():
+            continue
+        try:
+            rec = json.loads(raw)
+        except json.JSONDecodeError:
+            continue
+        if rec.get("ts", "") < cutoff:
+            continue
+        proj = rec.get("project", "?")
+        phase = rec.get("phase", "?")
+        oc = rec.get("outcome", "?")
+        phase_counts = summary.setdefault(proj, {}).setdefault(phase, {})
+        phase_counts[oc] = phase_counts.get(oc, 0) + 1
+    return summary
+
+
 # ── Default since ──────────────────────────────────────────────────────────────
 
 
@@ -492,6 +519,60 @@ def main() -> None:
         print(
             f"  {proj_path.name:<30}  {counts_str:<28}  last: {last_ticket} ({last_outcome}) @ {last_at}"
         )
+
+    # ── 7-day phase outcomes (beat-outcomes.jsonl) ──────────────────────────────
+    phase_summary = _outcomes_7day_summary()
+    if phase_summary:
+        print(f"\n{'═' * 72}")
+        print("7-DAY PHASE OUTCOMES  (from beat-outcomes.jsonl)")
+        print(f"{'═' * 72}")
+        for proj, phases in sorted(phase_summary.items()):
+            phase_parts: list[str] = []
+            for phase in ("housekeeping", "pick_ticket", "raid"):
+                ocs = phases.get(phase, {})
+                if not ocs:
+                    continue
+                oc_str = " ".join(
+                    f"{o}:{c}" for o, c in sorted(ocs.items(), key=lambda x: -x[1])
+                )
+                phase_parts.append(f"{phase}=[{oc_str}]")
+            if phase_parts:
+                print(f"  {proj:<30}  {'  '.join(phase_parts)}")
+
+        # Highlight any denial or budget events in the 7-day window
+        denial_lines: list[str] = []
+        if OUTCOMES_LOG.exists():
+            cutoff = (datetime.now(timezone.utc) - timedelta(days=7)).strftime(
+                "%Y-%m-%dT"
+            )
+            for raw in OUTCOMES_LOG.read_text().splitlines():
+                try:
+                    rec = json.loads(raw)
+                except json.JSONDecodeError:
+                    continue
+                if rec.get("ts", "") < cutoff:
+                    continue
+                if rec.get("denied"):
+                    ts = rec["ts"][:16]
+                    proj_n = rec.get("project", "?")
+                    phase = rec.get("phase", "?")
+                    tools = ", ".join(rec["denied"])
+                    denial_lines.append(f"  [{ts}] {proj_n}/{phase}: denied — {tools}")
+                if rec.get("outcome") == "budget":
+                    ts = rec["ts"][:16]
+                    proj_n = rec.get("project", "?")
+                    tid = rec.get("ticket_id", "—")
+                    denial_lines.append(
+                        f"  [{ts}] {proj_n}/raid ticket={tid}: budget exhausted"
+                    )
+        if denial_lines:
+            print(f"\n  {'─' * 68}")
+            print("  DENIALS / BUDGET HITS:")
+            seen_d: set[str] = set()
+            for ln in denial_lines:
+                if ln not in seen_d:
+                    print(ln)
+                    seen_d.add(ln)
 
     print()
 

@@ -1,0 +1,65 @@
+%erg v1
+Title: Beat outcome instrumentation — structured per-beat JSONL result log
+Status: closed
+Created: 2026-05-05
+Author: claude
+
+--- log ---
+2026-05-05T14:30Z claude created
+2026-05-05T14:35Z claude closed — implemented (commit 2248914)
+
+--- body ---
+## Context
+
+`beat.py` writes free-text log lines to stdout (captured by journald and
+`logs/`). There is no structured record of per-beat outcomes, so it is
+impossible to answer: "did last night's beats succeed? what fraction stalled
+on permission denials? which tickets are being repeatedly attempted?"
+
+Without this signal, tuning beat behavior (ticket selection, budget, scope) is
+guesswork.
+
+## Actions
+
+1. Define a `BeatOutcome` dataclass (or NamedTuple) with fields:
+   - `ts`: ISO8601 UTC string
+   - `host`: `socket.gethostname()`
+   - `project`: project path (str)
+   - `phase`: `"housekeeping"` | `"pick_ticket"` | `"raid"`
+   - `ticket_id`: str | None (None for housekeeping/pick_ticket)
+   - `outcome`: `"success"` | `"idle"` | `"skip"` | `"timeout"` | `"budget"` | `"fail"`
+   - `detail`: str (last line of agent stdout, or error message, ≤200 chars)
+
+2. Add `_record_outcome(outcome: BeatOutcome)` helper that appends one JSON
+   line to `~/.claude/logs/beat-outcomes.jsonl` (create file if absent).
+
+3. Call `_record_outcome` at every phase exit point in `beat.py`:
+   - `_housekeeping_phase`: "success" (commits pushed), "idle" (skipped),
+     "timeout", "fail"
+   - `pick_ticket` parsing: "idle" (IDLE keyword), "skip" (CLOSED repick
+     limit), the raw PICK decision itself is not an outcome — record after
+     the raid
+   - `_raid_phase` (new helper or inline): "success" (rc=0 + MR created),
+     "timeout", "budget" (budget flag from stderr), "fail"
+
+4. Update `nightbeat-report.py` to read `beat-outcomes.jsonl` and emit a
+   summary table: last 7 days, per-project, counts by outcome.
+
+## Test
+
+After a `BEAT_DRY_RUN=1` run, `~/.claude/logs/beat-outcomes.jsonl` should
+contain at least one line per project with `"outcome": "idle"` or `"skip"`
+(dry-run skips real Claude calls but should still record the decision).
+
+If dry-run can't emit records without a real run: run against one project
+manually (`BEAT_PROJECT=~/.claude python3 beat.py`) and check the JSONL.
+
+## Exit criteria
+
+- Each beat phase (housekeeping, pick_ticket, raid) appends one JSON line to
+  `~/.claude/logs/beat-outcomes.jsonl`.
+- `jq '.' ~/.claude/logs/beat-outcomes.jsonl` parses without error.
+- `nightbeat-report.py` shows a 7-day outcome table (success / idle / fail /
+  timeout counts per project).
+- Existing beat log lines (`=== housekeeping: ... ===`) are preserved — JSONL
+  is additive, not a replacement.

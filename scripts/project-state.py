@@ -2,6 +2,7 @@
 """Per-project state probe. JSON on stdout, exit 0 always."""
 
 import json
+import shutil
 import subprocess
 import sys
 import time
@@ -75,8 +76,10 @@ def ticket_state(project):
             "error": "no tickets/ directory",
         }
 
+    erg_bin = shutil.which("erg") or str(project / "tickets/tools/go/erg")
+
     try:
-        r = run(["erg", "ready", "--json", str(tickets_dir)], project)
+        r = run([erg_bin, "ready", "--json", str(tickets_dir)], project)
         if r.returncode != 0:
             return {
                 "ready": None,
