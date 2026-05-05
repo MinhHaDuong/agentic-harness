@@ -60,6 +60,7 @@ MODEL_SONNET: str = "sonnet"
 MODEL_HAIKU: str = "claude-haiku-4-5-20251001"
 
 PROJECTS_CONFIG: Path = HARNESS_DIR / "scripts" / "projects.json"
+OUTCOMES_LOG: Path = HARNESS_DIR / "logs" / "beat-outcomes.jsonl"
 
 # Weekly /fewer-permission-prompts cadence. Folded into nightbeat instead of
 # a dedicated systemd timer (ticket 0043). Lowercase weekday name; matched
@@ -82,6 +83,15 @@ class _State:
 
 
 _state = _State()
+
+
+@dataclass
+class _SkillResult:
+    result_text: str = ""
+    subtype: str = ""
+    permission_denials: list[str] = field(default_factory=list)
+    cost_usd: float = 0.0
+    is_error: bool = False
 
 
 # ── Per-project configuration ─────────────────────────────────────────────────
@@ -123,7 +133,9 @@ _PROJ_KEYS = {"budget_housekeeping", "budget_pick_ticket", "pick_ticket_model"}
 def load_projects(config_path: Path) -> list[ProjectConfig]:
     """Load project list from JSON; fall back to built-in defaults on any error."""
     if not config_path.exists():
-        print(f"[beat] {config_path} not found, using built-in defaults", file=sys.stderr)
+        print(
+            f"[beat] {config_path} not found, using built-in defaults", file=sys.stderr
+        )
         return list(_BUILTIN_PROJECTS)
     try:
         entries = json.loads(config_path.read_text())
@@ -191,11 +203,15 @@ def _cleanup_stale_in_progress(project: Path) -> None:
                 rec = json.loads(line)
                 if rec.get("outcome") == "in_progress":
                     epoch = datetime.fromisoformat(
-                        rec.get("last_run_at", "1970-01-01T00:00:00Z").replace("Z", "+00:00")
+                        rec.get("last_run_at", "1970-01-01T00:00:00Z").replace(
+                            "Z", "+00:00"
+                        )
                     ).timestamp()
                     if epoch < cutoff:
                         rec["outcome"] = "aborted"
-                        rec["diagnostics"] = "stale in_progress — cleaned on next beat start"
+                        rec["diagnostics"] = (
+                            "stale in_progress — cleaned on next beat start"
+                        )
                         line = json.dumps(rec, separators=(",", ":"))
                         changed = True
             except (json.JSONDecodeError, ValueError, TypeError):
@@ -260,6 +276,49 @@ def read_last_beat_record(project: Path) -> dict | None:
         return obj if isinstance(obj, dict) else None
     except json.JSONDecodeError:
         return None
+
+
+# ── Phase outcome log ─────────────────────────────────────────────────────────
+
+
+_HK_OUTCOME_MAP: dict[str, str] = {
+    "skipped": "idle",
+    "no-changes": "success",
+    "deferred": "success",
+    "timeout": "timeout",
+    "failed": "fail",
+}
+
+
+def _record_phase_outcome(
+    project: Path,
+    phase: str,
+    outcome: str,
+    *,
+    ticket_id: str | None = None,
+    detail: str = "",
+    skill_result: _SkillResult | None = None,
+) -> None:
+    """Append one phase-outcome record to OUTCOMES_LOG (always, including dry-run)."""
+    rec: dict = {
+        "ts": _now_iso(),
+        "host": socket.gethostname(),
+        "project": project.name,
+        "phase": phase,
+        "outcome": outcome,
+    }
+    if ticket_id is not None:
+        rec["ticket_id"] = ticket_id
+    if detail:
+        rec["detail"] = detail[:200]
+    if skill_result is not None:
+        if skill_result.cost_usd:
+            rec["cost_usd"] = round(skill_result.cost_usd, 4)
+        if skill_result.permission_denials:
+            rec["denied"] = skill_result.permission_denials
+    OUTCOMES_LOG.parent.mkdir(parents=True, exist_ok=True)
+    with OUTCOMES_LOG.open("a") as fh:
+        fh.write(json.dumps(rec, separators=(",", ":")) + "\n")
 
 
 # ── Signal handling ────────────────────────────────────────────────────────────
@@ -432,8 +491,8 @@ def run_skill(
     cwd: Path,
     project_scoped: bool = False,
     model: str = MODEL_SONNET,
-) -> tuple[int, str]:
-    """Invoke a Claude skill; return (exit_code, last_result_text).
+) -> tuple[int, _SkillResult]:
+    """Invoke a Claude skill; return (exit_code, _SkillResult).
 
     Streams stdout line-by-line for live logging.
     Returns exit_code=TIMEOUT_EXIT_CODE on timeout.
@@ -444,8 +503,8 @@ def run_skill(
     if DRY_RUN:
         _log(f"[dry-run] {' '.join(argv)}")
         if "pick-ticket" in skill:
-            return 0, "PICK: 9999"
-        return 0, "(dry-run ok)"
+            return 0, _SkillResult(result_text="PICK: 9999")
+        return 0, _SkillResult(result_text="(dry-run ok)")
 
     env = {**os.environ, "CLAUDE_NIGHT_SWEEP": "1"}
     proc = subprocess.Popen(  # noqa: S603
@@ -488,18 +547,27 @@ def run_skill(
     _state.current_proc = None
 
     if timed_out:
-        return TIMEOUT_EXIT_CODE, ""
+        return TIMEOUT_EXIT_CODE, _SkillResult()
 
-    result_text = ""
+    skill_result = _SkillResult()
     for line in stdout_lines:
         try:
             obj = json.loads(line)
             if obj.get("type") == "result":
-                result_text = obj.get("result", "")
+                skill_result = _SkillResult(
+                    result_text=obj.get("result", ""),
+                    subtype=obj.get("subtype", ""),
+                    permission_denials=[
+                        d.get("tool_name", "?")
+                        for d in obj.get("permission_denials", [])
+                    ],
+                    cost_usd=obj.get("total_cost_usd") or 0.0,
+                    is_error=bool(obj.get("is_error")),
+                )
         except json.JSONDecodeError:
             pass
 
-    return proc.returncode, result_text
+    return proc.returncode, skill_result
 
 
 # ── Origin sync ───────────────────────────────────────────────────────────────
@@ -521,7 +589,9 @@ def _sync_origin_main(project: Path) -> None:
         cwd=project,
     )
     default_branch = (
-        head_ref.stdout.strip().removeprefix("origin/") if head_ref.returncode == 0 else "main"
+        head_ref.stdout.strip().removeprefix("origin/")
+        if head_ref.returncode == 0
+        else "main"
     )
 
     # Fetch only the default branch; skip on network or auth failure.
@@ -575,7 +645,9 @@ def _sync_origin_main(project: Path) -> None:
             cwd=project,
         )
         if update.returncode == 0:
-            _log(f"=== sync: {default_branch} updated from origin (HEAD on {branch}) ===")
+            _log(
+                f"=== sync: {default_branch} updated from origin (HEAD on {branch}) ==="
+            )
         else:
             _log(
                 f"=== sync: {default_branch} update skipped — "
@@ -589,7 +661,9 @@ def _sync_origin_main(project: Path) -> None:
 
 
 def _setup_env() -> None:
-    os.environ["PATH"] = f"{Path.home() / '.local' / 'bin'}:/usr/local/bin:/usr/bin:/bin"
+    os.environ["PATH"] = (
+        f"{Path.home() / '.local' / 'bin'}:/usr/local/bin:/usr/bin:/bin"
+    )
     for var, val in {
         "GIT_AUTHOR_NAME": "claude-agent",
         "GIT_AUTHOR_EMAIL": "claude-agent@localhost",
@@ -777,6 +851,12 @@ def _raid(project: ProjectConfig) -> tuple[str, str | None]:
     # Housekeeping (conditional). Aborts beat on failure/timeout so
     # pick-ticket → raid never runs against a known-bad main.
     hk_outcome = _housekeeping_phase(project)
+    _record_phase_outcome(
+        path,
+        "housekeeping",
+        _HK_OUTCOME_MAP.get(hk_outcome, "fail"),
+        detail=hk_outcome,
+    )
     if hk_outcome in ("failed", "timeout"):
         return "aborted", None
 
@@ -786,6 +866,9 @@ def _raid(project: ProjectConfig) -> tuple[str, str | None]:
     # double-raid.
     if any(_ticket_recently_picked(t) for t in path.glob("tickets/*.erg")):
         _log("=== pick-ticket: skipped (cooldown-recent-pick) ===")
+        _record_phase_outcome(
+            path, "pick_ticket", "skip", detail="cooldown-recent-pick"
+        )
         return "idle", None
 
     # Weekly permission-allowlist diff (no-op except on prune day).
@@ -800,10 +883,10 @@ def _raid(project: ProjectConfig) -> tuple[str, str | None]:
     pick_model = MODEL_SONNET if _repo_active(path) else project.pick_ticket_model
     closed_attempts = 0
     ticket_id = None
-    pt_result = ""
+    pt_res = _SkillResult()
     while closed_attempts < MAX_CLOSED_REPICKS:
         _log(f"=== pick-ticket: running model={pick_model} {_now_iso()} ===")
-        pt_rc, pt_result = run_skill(
+        pt_rc, pt_res = run_skill(
             f"/pick-ticket\n\nRunning on: {hostname}",
             budget=project.budget_pick_ticket,
             timeout_s=PICK_TICKET_TIMEOUT_S,
@@ -813,11 +896,13 @@ def _raid(project: ProjectConfig) -> tuple[str, str | None]:
         )
 
         if pt_rc == TIMEOUT_EXIT_CODE:
+            _record_phase_outcome(path, "pick_ticket", "timeout", skill_result=pt_res)
             return "aborted", None
         if pt_rc != 0:
+            _record_phase_outcome(path, "pick_ticket", "fail", skill_result=pt_res)
             return "failed", None
 
-        status, ticket_id = parse_pick(pt_result)
+        status, ticket_id = parse_pick(pt_res.result_text)
         if status == "closed":
             closed_attempts += 1
             _log(
@@ -834,18 +919,34 @@ def _raid(project: ProjectConfig) -> tuple[str, str | None]:
             f"=== pick-ticket: idle — {MAX_CLOSED_REPICKS} consecutive CLOSED"
             " picks; aborting beat to avoid loop ==="
         )
+        _record_phase_outcome(
+            path,
+            "pick_ticket",
+            "skip",
+            detail=f"{MAX_CLOSED_REPICKS} consecutive CLOSED repicks",
+            skill_result=pt_res,
+        )
         return "idle", None
 
     if status == "idle":
-        last_result_line = pt_result.strip().splitlines()[-1] if pt_result.strip() else ""
-        _log(f"=== pick-ticket: idle — {last_result_line or 'IDLE: no eligible tickets'} ===")
+        last_result_line = (
+            pt_res.result_text.strip().splitlines()[-1]
+            if pt_res.result_text.strip()
+            else ""
+        )
+        _log(
+            f"=== pick-ticket: idle — {last_result_line or 'IDLE: no eligible tickets'} ==="
+        )
+        _record_phase_outcome(
+            path, "pick_ticket", "idle", detail=last_result_line, skill_result=pt_res
+        )
         return "idle", None
 
     _log(f"=== pick-ticket: picked {ticket_id} {_now_iso()} ===")
 
     # Raid
     _log(f"=== raid: running ticket {ticket_id} {_now_iso()} ===")
-    oc_rc, _ = run_skill(
+    oc_rc, oc_res = run_skill(
         f"/raid {ticket_id}\n\nRunning on: {hostname}",
         budget=BUDGET_RAID,
         timeout_s=RAID_TIMEOUT_S,
@@ -855,16 +956,30 @@ def _raid(project: ProjectConfig) -> tuple[str, str | None]:
 
     if oc_rc == TIMEOUT_EXIT_CODE:
         outcome = "aborted"
+        _record_phase_outcome(
+            path, "raid", "timeout", ticket_id=ticket_id, skill_result=oc_res
+        )
+    elif oc_res.subtype == "error_max_budget_usd":
+        outcome = "failed"
+        _record_phase_outcome(
+            path, "raid", "budget", ticket_id=ticket_id, skill_result=oc_res
+        )
     elif oc_rc != 0:
         outcome = "failed"
+        _record_phase_outcome(
+            path, "raid", "fail", ticket_id=ticket_id, skill_result=oc_res
+        )
     else:
         # v1 simplification: rc=0 → "done"; raid may write finer-grained
         # outcomes into beat-log itself, but we don't parse those here.
         outcome = "done"
+        _record_phase_outcome(
+            path, "raid", "success", ticket_id=ticket_id, skill_result=oc_res
+        )
         # Warn if raid exited cleanly but left the ticket open (double-pick risk).
         ticket_files = list(path.glob(f"tickets/{ticket_id}-*.erg"))
         if ticket_files:
-            status = next(
+            ticket_status = next(
                 (
                     ln.split()[1]
                     for ln in ticket_files[0].read_text().splitlines()
@@ -872,10 +987,10 @@ def _raid(project: ProjectConfig) -> tuple[str, str | None]:
                 ),
                 "",
             )
-            if status and status != "closed":
+            if ticket_status and ticket_status != "closed":
                 _log(
                     f"=== warning: raid done but ticket {ticket_id}"
-                    f" Status: {status} (not closed) — double-pick risk ==="
+                    f" Status: {ticket_status} (not closed) — double-pick risk ==="
                 )
 
     _log(f"=== raid: outcome={outcome} {_now_iso()} ===")
@@ -929,7 +1044,9 @@ def main() -> None:
     if last and last.get("outcome") == "in_progress":
         try:
             last_at = last.get("last_run_at", "1970-01-01T00:00:00Z")
-            last_epoch = datetime.fromisoformat(last_at.replace("Z", "+00:00")).timestamp()
+            last_epoch = datetime.fromisoformat(
+                last_at.replace("Z", "+00:00")
+            ).timestamp()
             if (time.time() - last_epoch) < CRASH_RECOVERY_WINDOW_S:
                 append_beat_log(
                     path,
@@ -975,7 +1092,9 @@ def main() -> None:
     ticket_label = ticket_id if ticket_id else "—"
     minutes, seconds = divmod(int(elapsed), 60)
     duration_str = f"{minutes}m {seconds}s" if minutes else f"{seconds}s"
-    print(f"beat: {path.name} ticket={ticket_label} outcome={outcome} duration={duration_str}")
+    print(
+        f"beat: {path.name} ticket={ticket_label} outcome={outcome} duration={duration_str}"
+    )
 
     _log(f"=== beat done elapsed={elapsed}s {_now_iso()} ===")
     if _state.log_fh is not None:
