@@ -35,13 +35,11 @@ Level 4 (Hooks) + raid + `/verify` loop + git-erg tickets + bibliography pipelin
 ## Open tickets
 
 - 0013 — bib-to-zotero (push refs.bib to Zotero via API at submission)
-- 0017 — bump verb instrumentation in erg validator + skills
-- 0026 — clarify Phase 7 scope-creep handling
-- 0027 — pick-ticket incremental assessment cache
 - 0028 — multiproject beat dashboard (Views 1-2)
 - 0029 — beat dashboard blocker graph (blocked by 0028)
-- 0031 — housekeeping: replace grep-based scan with `erg ready --json`
 - 0034 — housekeeping: split git-cleanup and ticket-scan into two phases
+- 0049 — enforce truth in ticket open status across the beat pipeline
+- 0052 — fix night-sweep permission denials on .erg ticket edits
 - 0044 — interactive session observer
 - 0047 — auto early context compaction in beat and raid
 - 0051 — beat should try another project when current one is idle or frozen
@@ -56,6 +54,8 @@ Level 4 (Hooks) + raid + `/verify` loop + git-erg tickets + bibliography pipelin
 - 0069 — per-project beat config (.claude/beat.json) with interval_minutes
 - 0070 — /dream skill — autonomous nightly memory consolidation
 - 0084 — cheap-worker delegation (blocked: needs WORKER_API_KEY + openai library)
+- 0087 — project-state.py: wrap make runner in try/except FileNotFoundError
+- 0089 — rebuild erg binary — enforce no-Status header per ticket-new skill
 - 0054 — [discussion] restore Five-Claws phase announcement at session start
 - 0055 — [discussion] milestone/epic layer above tickets
 - 0056 — [discussion] mid-session pause/resume checkpoints
