@@ -27,7 +27,7 @@ Parse the JSON output. Use its fields to populate checks 1–9 below without re-
 1. **Recent activity** — from `git.recent_commits`. List count and key themes.
 2. **Open PRs** — from `prs.open` / `prs.items`. Skip if `prs.error`.
 3. **Origin sync** — from `git.ahead` / `git.behind`. Skip if no remote.
-4. **Branch hygiene** — from `branches.local` / `branches.remote` / `branches.details`. Flag branches with `commits_beyond_default > 0`. For branches whose name contains a 4-digit ticket ID, check if the ticket file has `Status: closed`; flag those as cleanup candidates.
+4. **Branch hygiene** — from `branches.local` / `branches.remote` / `branches.details`. Flag branches with `commits_beyond_default > 0`. For branches whose name contains a 4-digit ticket ID, check if the ticket file has a `Closed:` line; flag those as cleanup candidates.
 5. **Worktrees** — from `worktrees`. Flag entries with `locked: true` whose lock pid is no longer running.
 6. **Working tree** — from `git.clean` / `git.dirty_files`. List uncommitted files if dirty.
 7. **Tests green** — from `tests.status` / `tests.detail`. Skip if `tests.runner == "none"`.

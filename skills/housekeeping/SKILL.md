@@ -27,7 +27,7 @@ Run full repo housekeeping and act on every finding.
     ```
     Emit any output as housekeeping warnings; do not abort on non-zero exit.
 
-2. **Healthcheck.** Invoke /healthcheck. The probe (`project-state.py --full`)
+2. **Healthcheck.** Invoke /healthcheck. The probe (`project-state.py`)
    runs once inside healthcheck and covers all checks — do not re-run git
    commands already collected there. Parse the **Action plan** section from
    the output: the bold headings `**fix-now**`, `**open-ticket**`, `**skip**`
