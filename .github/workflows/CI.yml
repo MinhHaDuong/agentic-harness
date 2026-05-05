@@ -10,14 +10,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version: '1.21'
-      - name: Build erg validator
-        working-directory: tickets/tools/go
-        run: go build -o erg .
       - name: Validate tickets
-        run: ./tickets/tools/go/erg validate tickets/
+        run: chmod +x ./bin/erg && ./bin/erg check tickets/
 
   skill-lint:
     runs-on: ubuntu-latest
