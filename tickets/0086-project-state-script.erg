@@ -1,6 +1,5 @@
 %erg v1
 Title: Write project-state.py — mechanical per-project state probe
-Status: open
 Created: 2026-05-05
 Author: claude
 
@@ -23,10 +22,10 @@ JSON on stdout, exit 0 always (errors as fields).
 
 ```json
 {
-  "path": "/home/haduong/aedist-technical-report",
+  "path": "/path/to/project",  <!-- harness-extension-point: illustrative -->
   "git": { "clean": true, "ahead": 0, "behind": 0, "branch": "main" },
   "housekeeping": { "state": "clean|needed|tidying", "branch": null,
-                    "last_commit_ts": "2026-05-04T21:00Z", "age_hours": 12.3 },
+                    "last_housekeeping_ts": "2026-05-04T21:00Z", "age_hours": 12.3 },
   "tickets": { "ready": 3, "open": 7, "ready_ids": ["0150", "0156", "0160"] }
 }
 ```

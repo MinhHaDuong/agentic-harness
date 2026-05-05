@@ -12,24 +12,34 @@ Run a healthcheck on the current repository. Report results concisely — one li
 
 This skill is user-level and must **gracefully degrade**: each check runs only if its prerequisites are present. Missing prerequisites yield a `skip` status with a one-line reason, never a fail.
 
+## Data collection
+
+First, run the mechanical probe to collect structured state:
+
+```bash
+python3 ~/.claude/scripts/project-state.py "$(git rev-parse --show-toplevel)" --full
+```
+
+Parse the JSON output. Use its fields to populate checks 1–7 below without re-running git commands. If the script is missing or fails, fall back to ad-hoc commands per check.
+
 ## Checks
 
-1. **Recent activity** — commits in the last 12 hours, key themes
-2. **Open PRs** — list or confirm zero. Skip if `gh` unavailable.
-3. **Origin sync** — ahead/behind/synced. Skip if no remote.
+1. **Recent activity** — commits in the last 12 hours, key themes (use `git log --since`)
+2. **Open PRs** — from `prs.open` / `prs.items`. Skip if `prs.error`.
+3. **Origin sync** — from `git.ahead` / `git.behind`. Skip if no remote.
 4. **Branch hygiene** — list all, flag stale feature branches
 5. **Worktrees** — list all, flag orphaned ones
-6. **Working tree** — clean or list uncommitted changes
-7. **Tests green** — autodetect test runner (make/pytest/npm), report pass/fail
+6. **Working tree** — from `git.clean`. List uncommitted if dirty.
+7. **Tests green** — from `tests.status` / `tests.detail`. Skip if `tests.runner == "none"`.
 8. **Docs freshness (deep verification)** — cross-check status/directive docs (`STATE.md`, `README.md`, etc.):
    - **Staleness** — flag docs whose content predates recent repo activity
    - **Ticket cross-check** — references to tickets whose status contradicts
      the doc (todo but closed, done but open, broken ref). Skip if no `.erg` tickets.
-     (Use `erg ready --json` for the initial ticket list; only read specific tickets
+     (Use `tickets.ready_ids` for the initial ticket list; only read specific tickets
      whose status contradicts a doc reference.)
    - **PR cross-check** — PRs described as pending but already merged/closed.
-     Skip if `gh` unavailable.
-   - **Count consistency** — "N open tickets" claims vs actual count
+     Use `prs.items` from the probe. Skip if `prs.error`.
+   - **Count consistency** — "N open tickets" claims vs `tickets.open` from probe
 
 ## Output format
 
