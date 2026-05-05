@@ -17,7 +17,7 @@ This skill is user-level and must **gracefully degrade**: each check runs only i
 First, run the mechanical probe to collect structured state:
 
 ```bash
-python3 ~/.claude/scripts/project-state.py "$(git rev-parse --show-toplevel)"
+python3 ~/.claude/scripts/project-state.py "$(git rev-parse --show-toplevel)" --tests
 ```
 
 Parse the JSON output. Use its fields to populate checks 1–9 below without re-running git commands — the probe covers everything through check 8; only check 9 requires additional file reads. If the script is missing or fails, fall back to ad-hoc commands per check.

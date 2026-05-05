@@ -4,7 +4,6 @@
 import json
 import shutil
 import subprocess
-import sys
 import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -288,11 +287,18 @@ def pr_state(project):
 
 
 def main():
-    if len(sys.argv) < 2:
-        print(json.dumps({"error": "usage: project-state.py <project-path>"}))
-        sys.exit(0)
+    import argparse
 
-    project = Path(sys.argv[1]).expanduser().resolve()
+    parser = argparse.ArgumentParser(
+        description="Per-project state probe. JSON on stdout, exit 0 always."
+    )
+    parser.add_argument("path", help="Project path")
+    parser.add_argument(
+        "--tests", action="store_true", help="Run test suite (may be slow)"
+    )
+    args = parser.parse_args()
+
+    project = Path(args.path).expanduser().resolve()
 
     out = {"path": str(project)}
 
@@ -302,7 +308,6 @@ def main():
         "tickets": ticket_state,
         "branches": branch_state,
         "worktrees": worktree_state,
-        "tests": test_state,
         "prs": pr_state,
     }
 
@@ -313,6 +318,18 @@ def main():
                 out[key] = future.result()
             except Exception as e:
                 out[key] = {"error": repr(e)}
+
+    if args.tests:
+        try:
+            out["tests"] = test_state(project)
+        except Exception as e:
+            out["tests"] = {"error": repr(e)}
+    else:
+        out["tests"] = {
+            "runner": "none",
+            "status": "skip",
+            "detail": "pass --tests to include",
+        }
 
     print(json.dumps(out, indent=2))
 
