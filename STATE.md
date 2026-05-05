@@ -1,6 +1,6 @@
 # Imperial Dragon Harness — State
 
-Last updated: 2026-05-05T14:45Z
+Last updated: 2026-05-05T17:55Z
 
 ## North star
 
@@ -23,6 +23,10 @@ Level 4 (Hooks) + raid + `/verify` loop + git-erg tickets + bibliography pipelin
 **Project state probe** (PR #100, 2026-05-05): `scripts/project-state.py <path> [--full]` — mechanical per-project JSON probe (git status, housekeeping state, ticket counts; full mode adds tests + PRs). Pure stdlib, exit 0 always. `/healthcheck` skill now calls it as its data-collection step. Foundation for upcoming `/eyes` multi-project survey.
 
 **Beat outcome instrumentation** (PR #101, 2026-05-05): `run_skill()` now returns `_SkillResult` (subtype, permission_denials, cost_usd, is_error). `_record_phase_outcome()` appends one JSONL record per phase to `~/.claude/logs/beat-outcomes.jsonl` — housekeeping (idle/success/timeout/fail), pick_ticket (idle/skip/timeout/fail), raid (success/budget/timeout/fail). Budget detected via `error_max_budget_usd` subtype. `nightbeat-report.py` shows 7-day phase outcome table and surfaces denial/budget events.
+
+**`/merge` skill** (PR #102, 2026-05-05): `skills/merge/erg-pr-merge` atomically closes the linked erg ticket (commits it into the PR branch so it lands in the squash) then merges via GitHub API — works from git worktrees and VMs. Gates on strict mergeability (`MERGEABLE` only), no failing checks, and no in-progress checks. Idempotent on retry. Leak-guard escape hatches on all `gh` calls.
+
+**erg binary convention** (PRs #103–104, 2026-05-05): `tickets/tools/go/main.go` (old bundled erg source, `Status:` format) removed. erg binary now commits under `tickets/tools/go/erg` and travels with the repo — gitignore exclusion removed. CI uses `tickets/tools/go/erg check tickets/` directly. All `$ERG` fallbacks in skills restored to `tickets/tools/go/erg`.
 
 **git-erg**: pre-commit hooks installed in all projects. CI live (ticket 0009, PR #4 merged). Validation split: `erg validate <files>` (per-file) vs `erg check [dir]` (corpus) defined in spec; binary implementation tracked by git-erg/0038.
 
