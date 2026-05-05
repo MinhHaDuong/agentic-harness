@@ -2,10 +2,12 @@
 Title: Write project-state.py — mechanical per-project state probe
 Created: 2026-05-05
 Author: claude
+Closed: implemented — scripts/project-state.py shipped, /healthcheck integrated (PR #100)
 
 --- log ---
 2026-05-05T09:00Z haduong created
 
+2026-05-05T13:37Z claude closed — implemented — scripts/project-state.py shipped, /healthcheck integrated (PR #100)
 --- body ---
 ## Context
 
