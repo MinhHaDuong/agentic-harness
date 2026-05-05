@@ -1,11 +1,12 @@
 %erg v1
 Title: Beat outcome instrumentation — structured per-beat JSONL result log
-Status: open
+Status: closed
 Created: 2026-05-05
 Author: claude
 
 --- log ---
 2026-05-05T14:30Z claude created
+2026-05-05T14:35Z claude closed — implemented (commit 2248914)
 
 --- body ---
 ## Context
