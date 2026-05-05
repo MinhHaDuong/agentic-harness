@@ -54,6 +54,13 @@ if [[ "$FAILING" -gt 0 ]]; then
     die "CI has ${FAILING} failing check(s) — fix before merging"
 fi
 
+PENDING=$(echo "$PR_JSON" | jq -r '
+    [.statusCheckRollup[]? | select(.status != "COMPLETED" and .status != null)]
+    | length')
+if [[ "$PENDING" -gt 0 ]]; then
+    die "CI has ${PENDING} check(s) still running — wait for completion"
+fi
+
 # ── Step 1: find ticket ID ────────────────────────────────────────────────────
 
 BODY=$(echo "$PR_JSON" | jq -r '.body // ""')
@@ -67,7 +74,9 @@ if [[ -n "$TICKET_ID" ]] && [[ -d tickets ]] && command -v erg &>/dev/null; then
     TICKET_GLOB="tickets/${TICKET_ID}-"*.erg
     # shellcheck disable=SC2086
     git add $TICKET_GLOB tickets/closed/ 2>/dev/null || true
-    git commit -m "ticket(${TICKET_ID}): close — PR #${PR}"
+    if ! git diff --cached --quiet; then
+        git commit -m "ticket(${TICKET_ID}): close — PR #${PR}"
+    fi
     git push
 elif [[ -n "$TICKET_ID" ]]; then
     echo "Note: ticket ${TICKET_ID} found but no erg available — skipping close"
