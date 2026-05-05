@@ -13,7 +13,6 @@ import json
 import os
 import re
 import secrets
-import shutil
 import signal
 import socket
 import subprocess
@@ -21,7 +20,7 @@ import sys
 import threading
 import time
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from io import TextIOBase
 from pathlib import Path
 
@@ -124,9 +123,7 @@ _PROJ_KEYS = {"budget_housekeeping", "budget_pick_ticket", "pick_ticket_model"}
 def load_projects(config_path: Path) -> list[ProjectConfig]:
     """Load project list from JSON; fall back to built-in defaults on any error."""
     if not config_path.exists():
-        print(
-            f"[beat] {config_path} not found, using built-in defaults", file=sys.stderr
-        )
+        print(f"[beat] {config_path} not found, using built-in defaults", file=sys.stderr)
         return list(_BUILTIN_PROJECTS)
     try:
         entries = json.loads(config_path.read_text())
@@ -152,7 +149,7 @@ PROJECTS: list[ProjectConfig] = load_projects(PROJECTS_CONFIG)
 
 
 def _now_iso() -> str:
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def _log(msg: str) -> None:
@@ -194,15 +191,11 @@ def _cleanup_stale_in_progress(project: Path) -> None:
                 rec = json.loads(line)
                 if rec.get("outcome") == "in_progress":
                     epoch = datetime.fromisoformat(
-                        rec.get("last_run_at", "1970-01-01T00:00:00Z").replace(
-                            "Z", "+00:00"
-                        )
+                        rec.get("last_run_at", "1970-01-01T00:00:00Z").replace("Z", "+00:00")
                     ).timestamp()
                     if epoch < cutoff:
                         rec["outcome"] = "aborted"
-                        rec["diagnostics"] = (
-                            "stale in_progress — cleaned on next beat start"
-                        )
+                        rec["diagnostics"] = "stale in_progress — cleaned on next beat start"
                         line = json.dumps(rec, separators=(",", ":"))
                         changed = True
             except (json.JSONDecodeError, ValueError, TypeError):
@@ -327,7 +320,7 @@ def housekeeping_needed(project: Path) -> bool:
     if age <= HOUSEKEEPING_INTERVAL_S:
         return False
     if age > HOUSEKEEPING_SAFETY_FLOOR_S:
-        last_hk_dt = datetime.fromtimestamp(int(parts[0]), tz=timezone.utc)
+        last_hk_dt = datetime.fromtimestamp(int(parts[0]), tz=UTC)
         if _repo_frozen_since(project, last_hk_dt):
             return False
         return True
@@ -528,9 +521,7 @@ def _sync_origin_main(project: Path) -> None:
         cwd=project,
     )
     default_branch = (
-        head_ref.stdout.strip().removeprefix("origin/")
-        if head_ref.returncode == 0
-        else "main"
+        head_ref.stdout.strip().removeprefix("origin/") if head_ref.returncode == 0 else "main"
     )
 
     # Fetch only the default branch; skip on network or auth failure.
@@ -584,9 +575,7 @@ def _sync_origin_main(project: Path) -> None:
             cwd=project,
         )
         if update.returncode == 0:
-            _log(
-                f"=== sync: {default_branch} updated from origin (HEAD on {branch}) ==="
-            )
+            _log(f"=== sync: {default_branch} updated from origin (HEAD on {branch}) ===")
         else:
             _log(
                 f"=== sync: {default_branch} update skipped — "
@@ -600,9 +589,7 @@ def _sync_origin_main(project: Path) -> None:
 
 
 def _setup_env() -> None:
-    os.environ["PATH"] = (
-        f"{Path.home() / '.local' / 'bin'}:/usr/local/bin:/usr/bin:/bin"
-    )
+    os.environ["PATH"] = f"{Path.home() / '.local' / 'bin'}:/usr/local/bin:/usr/bin:/bin"
     for var, val in {
         "GIT_AUTHOR_NAME": "claude-agent",
         "GIT_AUTHOR_EMAIL": "claude-agent@localhost",
@@ -639,69 +626,15 @@ def _git(*args: str, cwd: Path) -> subprocess.CompletedProcess:
     )
 
 
-def _gh_available() -> bool:
-    return shutil.which("gh") is not None
-
-
-PR_CHECK_POLL_INTERVAL_S: int = 15
-PR_CHECK_TIMEOUT_S: int = 10 * 60
-PR_CHECK_TRANSIENT_RETRIES: int = 3
-
-
-def _wait_for_pr_checks(branch: str, *, cwd: Path) -> bool:
-    """Block until all PR checks settle. Return True iff all pass.
-
-    Tolerates a small number of transient `gh pr checks` failures
-    (rate limit, network blip) before giving up.
-    """
-    deadline = time.monotonic() + PR_CHECK_TIMEOUT_S
-    transient_failures = 0
-    while time.monotonic() < deadline:
-        result = subprocess.run(  # noqa: S603, S607
-            ["gh", "pr", "checks", branch, "--json", "name,bucket"],
-            capture_output=True,
-            text=True,
-            check=False,
-            cwd=cwd,
-        )
-        if result.returncode != 0:
-            transient_failures += 1
-            if transient_failures > PR_CHECK_TRANSIENT_RETRIES:
-                return False
-            time.sleep(PR_CHECK_POLL_INTERVAL_S)
-            continue
-        try:
-            checks = json.loads(result.stdout)
-        except json.JSONDecodeError:
-            transient_failures += 1
-            if transient_failures > PR_CHECK_TRANSIENT_RETRIES:
-                return False
-            time.sleep(PR_CHECK_POLL_INTERVAL_S)
-            continue
-        transient_failures = 0
-        if not checks:
-            time.sleep(PR_CHECK_POLL_INTERVAL_S)
-            continue
-        buckets = {c.get("bucket") for c in checks}
-        if "pending" in buckets:
-            time.sleep(PR_CHECK_POLL_INTERVAL_S)
-            continue
-        return buckets <= {"pass"}
-    return False
-
-
 def _housekeeping_phase(project: ProjectConfig) -> str:
-    """Run housekeeping on a dedicated branch; PR+merge if commits land.
+    """Run housekeeping on a dedicated branch cut from origin/main.
 
     Returns one of:
       "skipped"    — housekeeping_needed was False
       "no-changes" — skill ran clean, produced no commits
-      "merged"     — PR opened, CI green, squash-merged into main
-      "deferred"   — commits exist locally; PR/merge automation off (no gh
-                     or BEAT_HOUSEKEEPING_PR != 1) — branch left for human
-      "ci-failed"  — PR opened but at least one check failed
+      "deferred"   — commits on branch, left for human review
       "timeout"    — skill timed out
-      "failed"     — git/gh/skill error
+      "failed"     — git or skill error
     """
     path = project.path
     if not housekeeping_needed(path):
@@ -713,14 +646,12 @@ def _housekeeping_phase(project: ProjectConfig) -> str:
         _log("=== housekeeping: cannot resolve origin/main ===")
         return "failed"
 
-    nonce = (
-        datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-        + "-"
-        + secrets.token_hex(2)
-    )
+    nonce = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ") + "-" + secrets.token_hex(2)
     branch = f"claude/housekeeping-{nonce}"
-    if _git("checkout", "-B", branch, base, cwd=path).returncode != 0:
-        _log(f"=== housekeeping: failed to create {branch} ===")
+    r = _git("checkout", "-B", branch, base, cwd=path)
+    if r.returncode != 0:
+        detail = (r.stderr or r.stdout or "").strip().replace("\n", " | ")
+        _log(f"=== housekeeping: failed to create {branch}: {detail} ===")
         return "failed"
 
     _log(f"=== housekeeping: running on {branch} {_now_iso()} ===")
@@ -743,69 +674,14 @@ def _housekeeping_phase(project: ProjectConfig) -> str:
         return "failed"
 
     n = _git("rev-list", "--count", f"{base}..HEAD", cwd=path).stdout.strip() or "0"
+    _git("checkout", "main", cwd=path)
     if int(n) == 0:
         _log("=== housekeeping: no commits, deleting branch ===")
-        _git("checkout", "main", cwd=path)
         _git("branch", "-D", branch, cwd=path)
         return "no-changes"
 
-    _log(f"=== housekeeping: {n} commit(s) on {branch} ===")
-
-    if not (os.environ.get("BEAT_HOUSEKEEPING_PR") == "1" and _gh_available()):
-        # Switch back to main so pick-ticket → raid don't run on the
-        # housekeeping branch and pick up its commits as their base.
-        _git("checkout", "main", cwd=path)
-        _log(f"=== housekeeping: deferred — branch {branch} ready for review ===")
-        return "deferred"
-
-    if _git("push", "-u", "origin", branch, cwd=path).returncode != 0:
-        return "failed"
-    log_lines = _git("log", "--format=- %s", f"{base}..HEAD", cwd=path).stdout.strip()
-    body = "Automated nightbeat housekeeping sweep.\n\n## Changes\n\n" + (
-        log_lines or "(none)"
-    )
-    pr = subprocess.run(  # noqa: S603, S607
-        [
-            "gh",
-            "pr",
-            "create",
-            "--base",
-            "main",
-            "--head",
-            branch,
-            "--title",
-            f"chore: housekeeping fixes (sweep) — {n} commit(s)",
-            "--body",
-            body,
-        ],
-        capture_output=True,
-        text=True,
-        check=False,
-        cwd=path,
-    )
-    if pr.returncode != 0:
-        _log(f"=== housekeeping: gh pr create failed: {pr.stderr.strip()} ===")
-        return "failed"
-
-    if not _wait_for_pr_checks(branch, cwd=path):
-        _log(f"=== housekeeping: CI red on {branch} — aborting beat ===")
-        return "ci-failed"
-
-    merge = subprocess.run(  # noqa: S603, S607
-        ["gh", "pr", "merge", branch, "--squash", "--delete-branch"],
-        capture_output=True,
-        text=True,
-        check=False,
-        cwd=path,
-    )
-    if merge.returncode != 0:
-        _log(f"=== housekeeping: gh pr merge failed: {merge.stderr.strip()} ===")
-        return "failed"
-
-    _git("checkout", "main", cwd=path)
-    _git("pull", "--ff-only", "origin", "main", cwd=path)
-    _log(f"=== housekeeping: merged {branch} {_now_iso()} ===")
-    return "merged"
+    _log(f"=== housekeeping: deferred — {n} commit(s) on {branch} ready for review ===")
+    return "deferred"
 
 
 def _ticket_recently_picked(ticket_path: Path, within_hours: int = 8) -> bool:
@@ -816,7 +692,7 @@ def _ticket_recently_picked(ticket_path: Path, within_hours: int = 8) -> bool:
     log shows it was picked within ``within_hours`` should not be re-picked
     until the prior raid has had a chance to close it.
     """
-    cutoff = datetime.now(timezone.utc) - timedelta(hours=within_hours)
+    cutoff = datetime.now(UTC) - timedelta(hours=within_hours)
     try:
         text = ticket_path.read_text()
     except (FileNotFoundError, OSError):
@@ -825,7 +701,7 @@ def _ticket_recently_picked(ticket_path: Path, within_hours: int = 8) -> bool:
         if "sweep-pick: selected" in line or "sweep-pick: picked" in line:
             try:
                 ts_str = line.split()[0].rstrip("Z")
-                ts = datetime.fromisoformat(ts_str).replace(tzinfo=timezone.utc)
+                ts = datetime.fromisoformat(ts_str).replace(tzinfo=UTC)
                 if ts > cutoff:
                     return True
             except (ValueError, IndexError):
@@ -890,10 +766,18 @@ def _raid(project: ProjectConfig) -> tuple[str, str | None]:
     # see current ticket state from merged PRs.
     _sync_origin_main(path)
 
-    # Housekeeping (conditional). Aborts beat on failure/timeout/CI-red so
+    # Ensure working tree is on main before any read or write.
+    # Fails fast with a clear message if the tree is dirty.
+    r = _git("checkout", "main", cwd=path)
+    if r.returncode != 0:
+        detail = (r.stderr or r.stdout or "").strip().replace("\n", " | ")
+        _log(f"=== beat aborted: cannot checkout main: {detail} ===")
+        return "aborted", None
+
+    # Housekeeping (conditional). Aborts beat on failure/timeout so
     # pick-ticket → raid never runs against a known-bad main.
     hk_outcome = _housekeeping_phase(project)
-    if hk_outcome in ("failed", "timeout", "ci-failed"):
+    if hk_outcome in ("failed", "timeout"):
         return "aborted", None
 
     # Cooldown-recent-pick guard (ticket 0051 Layer 0). If any open ticket
@@ -953,12 +837,8 @@ def _raid(project: ProjectConfig) -> tuple[str, str | None]:
         return "idle", None
 
     if status == "idle":
-        last_result_line = (
-            pt_result.strip().splitlines()[-1] if pt_result.strip() else ""
-        )
-        _log(
-            f"=== pick-ticket: idle — {last_result_line or 'IDLE: no eligible tickets'} ==="
-        )
+        last_result_line = pt_result.strip().splitlines()[-1] if pt_result.strip() else ""
+        _log(f"=== pick-ticket: idle — {last_result_line or 'IDLE: no eligible tickets'} ===")
         return "idle", None
 
     _log(f"=== pick-ticket: picked {ticket_id} {_now_iso()} ===")
@@ -1009,7 +889,7 @@ def main() -> None:
 
     # Per-run logfile (opened before lock so startup messages are captured)
     LOGDIR.mkdir(parents=True, exist_ok=True)
-    logfile = LOGDIR / f"{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}.log"
+    logfile = LOGDIR / f"{datetime.now(UTC).strftime('%Y%m%dT%H%M%SZ')}.log"
     _state.log_fh = logfile.open("a")
 
     # Rotate old logs
@@ -1049,9 +929,7 @@ def main() -> None:
     if last and last.get("outcome") == "in_progress":
         try:
             last_at = last.get("last_run_at", "1970-01-01T00:00:00Z")
-            last_epoch = datetime.fromisoformat(
-                last_at.replace("Z", "+00:00")
-            ).timestamp()
+            last_epoch = datetime.fromisoformat(last_at.replace("Z", "+00:00")).timestamp()
             if (time.time() - last_epoch) < CRASH_RECOVERY_WINDOW_S:
                 append_beat_log(
                     path,
@@ -1097,9 +975,7 @@ def main() -> None:
     ticket_label = ticket_id if ticket_id else "—"
     minutes, seconds = divmod(int(elapsed), 60)
     duration_str = f"{minutes}m {seconds}s" if minutes else f"{seconds}s"
-    print(
-        f"beat: {path.name} ticket={ticket_label} outcome={outcome} duration={duration_str}"
-    )
+    print(f"beat: {path.name} ticket={ticket_label} outcome={outcome} duration={duration_str}")
 
     _log(f"=== beat done elapsed={elapsed}s {_now_iso()} ===")
     if _state.log_fh is not None:

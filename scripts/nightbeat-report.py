@@ -20,12 +20,19 @@ from pathlib import Path
 HARNESS_DIR = Path.home() / ".claude"
 LOGDIR = HARNESS_DIR / "logs" / "nightbeat"
 PERMISSION_DIFFS_DIR = HARNESS_DIR / "telemetry" / "permission-diffs"
-PROJECTS: list[Path] = [
-    Path.home() / "aedist-technical-report",
-    Path.home() / "cadens",
-    Path.home() / "Climate_finance",
-    Path.home() / "fuzzy-corpus",
-]
+PROJECTS_CONFIG = HARNESS_DIR / "scripts" / "projects.json"
+
+
+def _load_rotation_projects() -> list[Path]:
+    """Load project paths from projects.json (same source as beat.py)."""
+    if not PROJECTS_CONFIG.exists():
+        return []
+    try:
+        entries = json.loads(PROJECTS_CONFIG.read_text())
+        return [Path(e["path"]).expanduser() for e in entries]
+    except Exception:
+        return []
+
 
 _MARKER = re.compile(r"^=== (.+?) (\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z) ===$")
 _RUN_RE = re.compile(r"^Run \d+\s+\S+\s+project slot \d+: (.+)$")
@@ -464,10 +471,11 @@ def main() -> None:
     )
 
     # ── Per-project beat-log summary ────────────────────────────────────────────
+    rotation = _load_rotation_projects()
     print(f"\n{'═' * 72}")
     print("PER-PROJECT SUMMARY  (from beat-log.jsonl)")
     print(f"{'═' * 72}")
-    for proj_path in PROJECTS:
+    for proj_path in rotation:
         summary = _beat_log_night_summary(proj_path, since)
         counts = summary["counts"]
         last = summary["last"]
