@@ -15,30 +15,29 @@ ticket state per project, without LLM derivation. Extract the minimum probe.
 
 ## What
 
-`~/.claude/scripts/project-state.py <project-path>`
+`~/.claude/scripts/project-state.py <project-path> [--full]`
 
-JSON on stdout, exit 0 always (errors as fields). Runs in <1s.
+JSON on stdout, exit 0 always (errors as fields).
+
+**Fast mode (default)** — runs in <1s:
 
 ```json
 {
   "path": "/home/haduong/aedist-technical-report",
-  "git": {
-    "clean": true,
-    "ahead": 0,
-    "behind": 0,
-    "branch": "main"
-  },
-  "housekeeping": {
-    "state": "clean | needed | tidying",
-    "branch": "claude/housekeeping-20260505T040423Z-27ce | null",
-    "last_commit_ts": "2026-05-04T21:00Z | null",
-    "age_hours": 12.3
-  },
-  "tickets": {
-    "ready": 3,
-    "open": 7,
-    "ready_ids": ["0150", "0156", "0160"]
-  }
+  "git": { "clean": true, "ahead": 0, "behind": 0, "branch": "main" },
+  "housekeeping": { "state": "clean|needed|tidying", "branch": null,
+                    "last_commit_ts": "2026-05-04T21:00Z", "age_hours": 12.3 },
+  "tickets": { "ready": 3, "open": 7, "ready_ids": ["0150", "0156", "0160"] }
+}
+```
+
+**Full mode (`--full`)** — adds tests and PRs (may take seconds):
+
+```json
+{ ...,
+  "tests": { "runner": "make|pytest|npm|none", "status": "pass|fail|skip",
+             "detail": "12 passed / 0 failed" },
+  "prs": { "open": 2, "items": [{"number": 42, "title": "...", "branch": "..."}] }
 }
 ```
 
@@ -52,19 +51,29 @@ JSON on stdout, exit 0 always (errors as fields). Runs in <1s.
 - Pure stdlib Python (no third-party imports).
 - Git queries via `subprocess` (same pattern as `beat.py`).
 - `erg ready --json` for ticket list; degrade gracefully if binary absent.
+- `gh pr list --json` for PRs; degrade gracefully if `gh` absent.
+- Test runner autodetection: Makefile → `make check-fast` (fallback `make test`),
+  pyproject.toml → `pytest --tb=no -q`, package.json → `npm test`.
 - Threshold hardcoded to 12h (matches `HOUSEKEEPING_INTERVAL_S` in beat.py).
+
+## Skill integration
+
+Update `/healthcheck` skill to call `project-state.py --full` as its
+data-collection step instead of ad-hoc git commands.
 
 ## Exit criteria
 
 - `python3 ~/.claude/scripts/project-state.py ~/.claude` outputs valid JSON.
+- `python3 ~/.claude/scripts/project-state.py ~/.claude --full` includes `tests`
+  and `prs` fields.
 - Running against a project with a dirty working tree sets `git.clean: false`.
 - Running against a project with a `claude/housekeeping-*` branch sets
   `housekeeping.state: "tidying"`.
 - Running against a project with no `erg` binary sets `tickets.ready: null`
   and includes `"error": "erg not found"` in the tickets object.
+- `/healthcheck` skill calls `project-state.py --full`.
 
 ## Deferred (do not add without a caller)
 
-- `--full` mode (tests, PRs)
 - `--threshold-hours` flag
 - `beat.py` integration
