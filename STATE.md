@@ -34,7 +34,6 @@ Level 4 (Hooks) + raid + `/verify` loop + git-erg tickets + bibliography pipelin
 - 0029 — beat dashboard blocker graph (blocked by 0028)
 - 0031 — housekeeping: replace grep-based scan with `erg ready --json`
 - 0034 — housekeeping: split git-cleanup and ticket-scan into two phases
-- 0041 — investigate mid-session context reset between sub-skills
 - 0044 — interactive session observer
 - 0047 — auto early context compaction in beat and raid
 - 0051 — beat should try another project when current one is idle or frozen
