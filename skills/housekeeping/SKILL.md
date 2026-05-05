@@ -28,7 +28,7 @@ Run full repo housekeeping and act on every finding.
     folder-closure issues. Degrade gracefully if the command is not yet
     installed:
     ```bash
-    ERG=${ERG:-bin/erg}
+    ERG=${ERG:-tickets/tools/go/erg}
     $ERG check tickets/ 2>/dev/null || true
     ```
     Emit any output as housekeeping warnings; do not abort on non-zero exit.

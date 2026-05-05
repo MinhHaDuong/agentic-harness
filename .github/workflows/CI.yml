@@ -11,7 +11,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Validate tickets
-        run: chmod +x ./bin/erg && ./bin/erg check tickets/
+        run: chmod +x ./tickets/tools/go/erg && ./tickets/tools/go/erg check tickets/
 
   skill-lint:
     runs-on: ubuntu-latest
