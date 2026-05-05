@@ -18,7 +18,7 @@ from a conversation. Extract the intent and normalize to `%erg v1`.
 
 1. Determine the next ID:
    ```bash
-   ERG=${ERG:-tickets/tools/go/erg}
+   ERG=${ERG:-bin/erg}
    $ERG next-id tickets/
    ```
    Always use `erg next-id` — never compute or guess the ID manually.
