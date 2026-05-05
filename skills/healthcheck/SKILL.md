@@ -17,21 +17,22 @@ This skill is user-level and must **gracefully degrade**: each check runs only i
 First, run the mechanical probe to collect structured state:
 
 ```bash
-python3 ~/.claude/scripts/project-state.py "$(git rev-parse --show-toplevel)" --full
+python3 ~/.claude/scripts/project-state.py "$(git rev-parse --show-toplevel)"
 ```
 
-Parse the JSON output. Use its fields to populate checks 1–7 below without re-running git commands. If the script is missing or fails, fall back to ad-hoc commands per check.
+Parse the JSON output. Use its fields to populate checks 1–9 below without re-running git commands — the probe covers everything through check 8; only check 9 requires additional file reads. If the script is missing or fails, fall back to ad-hoc commands per check.
 
 ## Checks
 
-1. **Recent activity** — commits in the last 12 hours, key themes (use `git log --since`)
+1. **Recent activity** — from `git.recent_commits`. List count and key themes.
 2. **Open PRs** — from `prs.open` / `prs.items`. Skip if `prs.error`.
 3. **Origin sync** — from `git.ahead` / `git.behind`. Skip if no remote.
-4. **Branch hygiene** — list all, flag stale feature branches
-5. **Worktrees** — list all, flag orphaned ones
-6. **Working tree** — from `git.clean`. List uncommitted if dirty.
+4. **Branch hygiene** — from `branches.local` / `branches.remote` / `branches.details`. Flag branches with `commits_beyond_default > 0`. For branches whose name contains a 4-digit ticket ID, check if the ticket file has `Status: closed`; flag those as cleanup candidates.
+5. **Worktrees** — from `worktrees`. Flag entries with `locked: true` whose lock pid is no longer running.
+6. **Working tree** — from `git.clean` / `git.dirty_files`. List uncommitted files if dirty.
 7. **Tests green** — from `tests.status` / `tests.detail`. Skip if `tests.runner == "none"`.
-8. **Docs freshness (deep verification)** — cross-check status/directive docs (`STATE.md`, `README.md`, etc.):
+8. **Housekeeping** — from `housekeeping.state` / `housekeeping.age_hours` / `housekeeping.branch`. Report `ok` if `state == "clean"` (age ≤ 12 h), `warn` if `state == "needed"` (overdue) or `state == "tidying"` (a `claude/housekeeping-*` branch is in flight). Skip if probe missing.
+9. **Docs freshness (deep verification)** — cross-check status/directive docs (`STATE.md`, `README.md`, etc.):
    - **Staleness** — flag docs whose content predates recent repo activity
    - **Ticket cross-check** — references to tickets whose status contradicts
      the doc (todo but closed, done but open, broken ref). Skip if no `.erg` tickets.
@@ -55,6 +56,7 @@ Parse the JSON output. Use its fields to populate checks 1–7 below without re-
 | Worktrees        | ...    | N active                     |
 | Working tree     | ...    | clean / N changes            |
 | Tests green      | ...    | N passed / K failed          |
+| Housekeeping     | ...    | clean / needed / tidying     |
 | Docs freshness   | ...    | N docs scanned, K stale refs |
 ```
 
@@ -91,5 +93,7 @@ Format:
 ```
 
 Omit a heading if it has no entries. If all checks are `ok`, omit the Action plan entirely.
+
+> **Contract** — `/housekeeping` parses this section programmatically. The bold headings `**fix-now**`, `**open-ticket**`, `**skip**` are a stable interface; do not rename or reformat them.
 
 Once the Action plan is fully effected, propose: "Surface remaining nits?"
