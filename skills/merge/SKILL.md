@@ -1,6 +1,6 @@
 ---
 name: merge
-description: Atomically close the linked ticket and squash-merge a PR. Must be run from the PR head branch. Works in git worktrees and on VMs.
+description: Atomically close the linked ticket and squash-merge a PR. Must be run from the PR head branch. Works in git worktrees and on VMs. GitHub-only (requires the GitHub CLI).
 user-invocable: true
 argument-hint: [pr-number]
 ---
