@@ -1,0 +1,40 @@
+%erg v1
+Title: Rebuild erg binary — enforce no-Status header per ticket-new skill
+Status: open
+Created: 2026-05-05
+Author: claude
+
+--- log ---
+2026-05-05T14:45Z claude created
+
+--- body ---
+## Context
+
+`tickets/tools/go/erg` (the project-local binary, built from the git-erg
+submodule) currently requires a `Status:` header and rejects tickets without
+it. The `ticket-new` skill instructs agents to omit `Status:` — "Note:
+no `Status:` header — `erg validate` rejects it."
+
+This inconsistency means every `ticket-new` run either (a) fails validation
+until `Status:` is manually added, or (b) silently violates the skill
+spec. Both happened in the 2026-05-05 session (tickets 0087, 0088).
+
+The source of truth is `tickets/FORMAT.md`, which lists `Status` as required.
+The ticket-new skill is wrong, OR the binary was rebuilt from a newer spec
+that dropped `Status:`. Either way, the binary and the skill must agree.
+
+## Actions
+
+1. Check the git-erg submodule HEAD and read the current validator source
+   to determine which behaviour is authoritative (Status required vs. omitted).
+2. If the submodule binary is stale: `cd tickets/tools && go build -o go/erg .`
+   and commit the new binary.
+3. If the skill is wrong: update `skills/ticket-new/SKILL.md` to restore the
+   `Status: open` line in the template.
+4. Verify: `erg validate tickets/0088-beat-outcome-instrumentation.erg` passes
+   without adding or removing `Status:`.
+
+## Exit criteria
+
+- `erg validate` and `ticket-new` agree on whether `Status:` is required.
+- All open tickets in `tickets/` pass validation without manual edits.
