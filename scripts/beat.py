@@ -979,18 +979,12 @@ def _raid(project: ProjectConfig) -> tuple[str, str | None]:
         # Warn if raid exited cleanly but left the ticket open (double-pick risk).
         ticket_files = list(path.glob(f"tickets/{ticket_id}-*.erg"))
         if ticket_files:
-            ticket_status = next(
-                (
-                    ln.split()[1]
-                    for ln in ticket_files[0].read_text().splitlines()
-                    if ln.startswith("Status:")
-                ),
-                "",
-            )
-            if ticket_status and ticket_status != "closed":
+            header_lines = ticket_files[0].read_text().splitlines()[:10]
+            is_closed = any(ln.startswith("Closed:") for ln in header_lines)
+            if not is_closed:
                 _log(
                     f"=== warning: raid done but ticket {ticket_id}"
-                    f" Status: {ticket_status} (not closed) — double-pick risk ==="
+                    f" not closed — double-pick risk ==="
                 )
 
     _log(f"=== raid: outcome={outcome} {_now_iso()} ===")
