@@ -25,7 +25,7 @@ JSON on stdout, exit 0 always (errors as fields).
   "path": "/path/to/project",  <!-- harness-extension-point: illustrative -->
   "git": { "clean": true, "ahead": 0, "behind": 0, "branch": "main" },
   "housekeeping": { "state": "clean|needed|tidying", "branch": null,
-                    "last_commit_ts": "2026-05-04T21:00Z", "age_hours": 12.3 },
+                    "last_housekeeping_ts": "2026-05-04T21:00Z", "age_hours": 12.3 },
   "tickets": { "ready": 3, "open": 7, "ready_ids": ["0150", "0156", "0160"] }
 }
 ```

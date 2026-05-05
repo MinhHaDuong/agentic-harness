@@ -60,7 +60,7 @@ def housekeeping_state(project):
     return {
         "state": state,
         "branch": hk_branch,
-        "last_commit_ts": last_ts,
+        "last_housekeeping_ts": last_ts,
         "age_hours": age_hours,
     }
 
@@ -137,22 +137,27 @@ def test_state(project):
         }
 
     if (project / "pyproject.toml").exists() or (project / "setup.py").exists():
-        r = run(["pytest", "--tb=no", "-q"], project)
-        if r.returncode != 127:
+        try:
+            r = run(["pytest", "--tb=no", "-q"], project)
             last_line = r.stdout.strip().splitlines()[-1] if r.stdout.strip() else ""
             return {
                 "runner": "pytest",
                 "status": "pass" if r.returncode == 0 else "fail",
                 "detail": last_line,
             }
+        except FileNotFoundError:
+            return {"runner": "pytest", "status": "skip", "detail": "pytest not found"}
 
     if (project / "package.json").exists():
-        r = run(["npm", "test"], project)
-        return {
-            "runner": "npm",
-            "status": "pass" if r.returncode == 0 else "fail",
-            "detail": r.stdout.strip().splitlines()[-1] if r.stdout.strip() else "",
-        }
+        try:
+            r = run(["npm", "test"], project)
+            return {
+                "runner": "npm",
+                "status": "pass" if r.returncode == 0 else "fail",
+                "detail": r.stdout.strip().splitlines()[-1] if r.stdout.strip() else "",
+            }
+        except FileNotFoundError:
+            return {"runner": "npm", "status": "skip", "detail": "npm not found"}
 
     return {"runner": "none", "status": "skip", "detail": "no test runner detected"}
 
