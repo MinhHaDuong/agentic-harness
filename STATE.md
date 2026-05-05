@@ -1,6 +1,6 @@
 # Imperial Dragon Harness — State
 
-Last updated: 2026-05-04T23:00Z
+Last updated: 2026-05-05T13:45Z
 
 ## North star
 
@@ -19,6 +19,8 @@ Level 4 (Hooks) + raid + `/verify` loop + git-erg tickets + bibliography pipelin
 **Idle skip**: housekeeping skipped when repo has no commits since last run (ticket 0036 closed).
 
 **Token economy** (PR #97, 2026-05-04): deterministic skill steps extracted to scripts — `scripts/smoke.sh`, `scripts/bib-merge.py`, `scripts/validate-refs.py`. Skills now make 1 Bash call for mechanical work; LLM handles only non-deterministic steps. `erg validate <files>` (not directory) used at all call sites; `erg check tickets/` added to housekeeping with graceful fallback pending git-erg/0038.
+
+**Project state probe** (PR #100, 2026-05-05): `scripts/project-state.py <path> [--full]` — mechanical per-project JSON probe (git status, housekeeping state, ticket counts; full mode adds tests + PRs). Pure stdlib, exit 0 always. `/healthcheck` skill now calls it as its data-collection step. Foundation for upcoming `/eyes` multi-project survey.
 
 **git-erg**: pre-commit hooks installed in all projects. CI live (ticket 0009, PR #4 merged). Validation split: `erg validate <files>` (per-file) vs `erg check [dir]` (corpus) defined in spec; binary implementation tracked by git-erg/0038.
 

@@ -1,0 +1,32 @@
+%erg v1
+Title: project-state.py: wrap make runner in try/except FileNotFoundError
+Created: 2026-05-05
+Author: claude
+
+--- log ---
+2026-05-05T13:45Z claude created — residual gap from PR #100 verify-gate
+
+--- body ---
+## Context
+
+In `scripts/project-state.py`, `test_state()` wraps the `pytest` and `npm`
+runner invocations in `try/except FileNotFoundError` (added in PR #100 review
+fix). The `make` runner is not wrapped — if `make` is absent, `subprocess.run`
+raises `FileNotFoundError` that bubbles to `main()`'s top-level handler,
+replacing the full JSON output with `{"path": ..., "error": "..."}`.
+
+`make` is almost always present on Unix hosts, so this is low-probability but
+inconsistent with the other runners.
+
+## What
+
+In `scripts/project-state.py`, wrap the `run(["make", target], project)` call
+in `try/except FileNotFoundError` and return:
+
+```python
+{"runner": "make", "status": "skip", "detail": "make not found"}
+```
+
+## Exit criteria
+
+- `test_state()` with `make` absent returns `{"runner": "make", "status": "skip", "detail": "make not found"}` without corrupting top-level output.
