@@ -1,0 +1,41 @@
+%erg v1
+Title: Deduplicate _default_branch helper between beat.py and project-state.py
+Created: 2026-05-05
+Author: claude-agent
+
+--- log ---
+2026-05-05T18:30Z claude-agent created
+
+--- body ---
+## Context
+
+`_default_branch(project)` — reads `refs/remotes/origin/HEAD`, strips the
+`origin/` prefix, falls back to `"main"` — exists identically in two scripts:
+
+- `scripts/beat.py` (extracted in PR #105 from inline code)
+- `scripts/project-state.py` (added in PR #105)
+
+Both scripts are standalone CLI tools with no shared import path today, so
+the duplication was accepted as out-of-scope during the PR. The helper is
+small but its fallback logic (`"main"`) is a policy decision that should
+live in one place.
+
+## Actions
+
+1. Create `scripts/git_utils.py` (or `scripts/harness_utils.py`) with
+   `_default_branch(project: Path) -> str` as the single definition.
+2. Replace the duplicated implementations in `beat.py` and
+   `project-state.py` with an import from the shared module.
+3. Verify both scripts still run standalone (`python3 scripts/beat.py --help`,
+   `python3 scripts/project-state.py .`).
+
+## Test
+
+Running `python3 scripts/project-state.py ~/.claude` returns a `git` block
+with correct data on a repo whose default branch is not `main`.
+
+## Exit criteria
+
+- `_default_branch` defined in exactly one file under `scripts/`
+- `beat.py` and `project-state.py` import it from there
+- Both scripts pass a standalone smoke-test invocation
