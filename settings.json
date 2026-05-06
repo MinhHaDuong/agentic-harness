@@ -21,7 +21,7 @@
       "Bash(uv sync *)",
       "Bash(git merge *)",
       "Bash(sh /home/haduong/CNRS/code/git-erg/bin/install.sh '/home/haduong/CNRS/projets/actifs/Tracing Kieu')",
-      "Bash('/home/haduong/CNRS/projets/actifs/Tracing Kieu/tickets/tools/go/erg' validate '/home/haduong/CNRS/projets/actifs/Tracing Kieu/tickets/')",
+      "Bash('/home/haduong/CNRS/projets/actifs/Tracing Kieu/tickets/erg' validate '/home/haduong/CNRS/projets/actifs/Tracing Kieu/tickets/')",
       "WebFetch(domain:tracingkieu.net)",
       "WebFetch(domain:minh.haduong.com)",
       "Read(//home/haduong/perso/Life manual/Heroes/9 Thich Nhat Hanh/**)",
