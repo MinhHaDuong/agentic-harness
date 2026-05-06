@@ -32,3 +32,4 @@ tickets/tools/go/*.test
 # Python build artefacts inside whitelisted dirs
 **/__pycache__/
 *.pyc
+tickets/erg
