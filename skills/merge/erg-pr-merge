@@ -72,11 +72,10 @@ ERG=${ERG:-erg}
 if [[ -n "$TICKET_ID" ]] && [[ -d tickets ]] && command -v "$ERG" &>/dev/null; then
     echo "Closing ticket ${TICKET_ID}..."
     "$ERG" close "$TICKET_ID" "autoclosed — PR #${PR}"
-    TICKET_GLOB="tickets/${TICKET_ID}-"*.erg
-    # shellcheck disable=SC2086
-    git add $TICKET_GLOB tickets/closed/ 2>/dev/null || true
+    "$ERG" archive "$TICKET_ID" 2>/dev/null || true
+    git add tickets/ 2>/dev/null || true
     if ! git diff --cached --quiet; then
-        git commit -m "ticket(${TICKET_ID}): close — PR #${PR}"
+        git commit -m "ticket(${TICKET_ID}): close and archive — PR #${PR}"
     fi
     git push origin HEAD
 elif [[ -n "$TICKET_ID" ]]; then
