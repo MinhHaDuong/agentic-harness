@@ -1,5 +1,5 @@
 %erg v1
-Title: Update erg fallback path from tickets/tools/go/erg to tickets/erg
+Title: Catch up IDH with git-erg changes (binary move, erg init simplification)
 Created: 2026-05-06
 Author: haduong
 
@@ -10,13 +10,16 @@ Author: haduong
 
 --- body ---
 ## Context
-The `erg` binary moved from `tickets/tools/go/erg` to `tickets/erg`. All IDH skill
-fallback expressions and documentation still referenced the old location.
+git-erg merged several changes that IDH had not caught up with:
+- binary moved from `tickets/tools/go/erg` to `tickets/erg`
+- `erg init` simplified to unpack-only (AGENTS.md, spec-erg-v1.md, integration.md); no longer manages integration/ directory
+- FORMAT.md superseded by spec-erg-v1.md
 
 ## Exit criteria
 - [x] `${ERG:-tickets/tools/go/erg}` → `${ERG:-tickets/erg}` in all skill files
 - [x] `harness-rules/tickets.md` validate command updated
-- [x] `settings.json` Tracing Kieu hook updated
-- [x] Memory `project_erg_binary.md` updated
-- [x] STATE.md erg binary convention note updated
+- [x] `settings.json` (IDH + Tracing Kieu) updated
 - [x] Per-project settings.json files updated (aedist, fuzzy-corpus, padme, chemin-de-voix, cadens)
+- [x] Memory and STATE.md updated
+- [x] FORMAT.md removed; `erg init` run — AGENTS.md, spec-erg-v1.md, integration.md committed
+- [x] `tickets/erg` binary committed; stale `tickets/tools/go/erg` removed
