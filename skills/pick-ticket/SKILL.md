@@ -13,7 +13,7 @@ Select one ticket for the current sweep run.
 
 0. Resolve the `erg` binary once:
    ```bash
-   ERG=$(command -v erg 2>/dev/null || echo "tickets/tools/go/erg")
+   ERG=$(command -v erg 2>/dev/null || echo "tickets/erg")
    ```
    Use `$ERG` for every subsequent call. Never search for the binary again.
 
